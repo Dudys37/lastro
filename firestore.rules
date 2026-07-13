@@ -1,0 +1,61 @@
+rules_version = '2';
+// ═══ LASTRO — Regras Firestore (F0/F1) ═══
+// O modelo de papéis vive AQUI (servidor); o cliente apenas espelha (PODE em
+// dominio.ts). Papéis: dono > admin > editor > leitor.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+    function meuPapel(ws) {
+      return get(/databases/$(database)/documents/workspaces/$(ws)/membros/$(request.auth.uid)).data.papel;
+    }
+    function souMembro(ws) {
+      return autenticado()
+        && exists(/databases/$(database)/documents/workspaces/$(ws)/membros/$(request.auth.uid));
+    }
+    function pelomenosEditor(ws) { return souMembro(ws) && meuPapel(ws) in ['dono','admin','editor']; }
+    function pelomenosAdmin(ws)  { return souMembro(ws) && meuPapel(ws) in ['dono','admin']; }
+    function souDono(ws)         { return souMembro(ws) && meuPapel(ws) == 'dono'; }
+
+    match /workspaces/{ws} {
+      // criar: qualquer autenticado, desde que se registre como único membro-espelho
+      allow create: if autenticado()
+        && request.resource.data.criadoPor == request.auth.uid
+        && request.resource.data.membrosUids == [request.auth.uid];
+      // get = abrir 1 doc (membro); list = consulta "meus workspaces".
+      // Regras de LIST precisam ser prováveis pelo filtro da própria query —
+      // por isso validam contra membrosUids, exatamente o campo filtrado.
+      allow get: if souMembro(ws);
+      allow list: if autenticado() && request.auth.uid in resource.data.membrosUids;
+      // atualizar nome/config: admin+; membrosUids só muda em fluxos de membros (F1: via convite)
+      allow update: if pelomenosAdmin(ws);
+      allow delete: if souDono(ws);
+
+      match /membros/{uid} {
+        allow read: if souMembro(ws);
+        // bootstrap: o criador grava a si mesmo como dono junto da criação
+        allow create: if autenticado() && uid == request.auth.uid
+          && request.resource.data.papel == 'dono'
+          && get(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor == request.auth.uid;
+        // gestão de papéis: admin+ (F1 refina: dono não pode ser rebaixado por admin)
+        allow update, delete: if pelomenosAdmin(ws) && uid != get(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor;
+      }
+
+      // Núcleo financeiro (F2+): leitura p/ membros; escrita p/ editor+;
+      // configuração (contas/cartões/categorias/orçamentos) p/ admin+.
+      match /lancamentos/{id} { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); }
+      match /contas/{id}      { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
+      match /cartoes/{id}     { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
+      match /categorias/{id}  { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
+      match /orcamentos/{id}  { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
+      match /metas/{id}       { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); }
+    }
+
+    // Convites (F1): criados por admin+ do workspace; aceite via Cloud Function
+    // ou transação validada — detalhado na F1.
+    match /convites/{id} {
+      allow create: if autenticado() && pelomenosAdmin(request.resource.data.workspaceId);
+      allow read: if autenticado();
+    }
+  }
+}

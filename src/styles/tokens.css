@@ -1,0 +1,51 @@
+/* ═══ LASTRO — Design Tokens (F0) ═══
+   Dois temas de primeira classe desde o dia 1.
+   Valores em canais RGB para compor com alpha no Tailwind. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ── Tema claro (padrão): profissional, superfícies em camadas ── */
+  --bg: 241 243 246;
+  --bg2: 232 235 240;
+  --card: 255 255 255;
+  --card2: 247 249 251;
+  --line: 223 228 236;
+  --line2: 201 209 221;
+  --ink: 19 23 34;
+  --ink2: 90 100 114;
+  --ink3: 152 162 179;
+  --brand: 13 148 136;
+  --brand-dim: 15 118 110;
+  --pos: 16 185 129;
+  --neg: 239 68 68;
+  --warn: 217 119 6;
+  --info: 2 132 199;
+  --shadow-1: 0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .05);
+  --shadow-2: 0 4px 16px rgb(16 24 40 / .08);
+}
+
+.dark {
+  /* ── Tema escuro premium fintech ── */
+  --bg: 10 12 18;
+  --bg2: 15 18 26;
+  --card: 20 24 34;
+  --card2: 26 31 43;
+  --line: 42 48 63;
+  --line2: 58 66 84;
+  --ink: 241 242 246;
+  --ink2: 155 163 178;
+  --ink3: 104 112 128;
+  --brand: 45 212 191;
+  --brand-dim: 20 184 166;
+  --pos: 52 211 153;
+  --neg: 248 113 113;
+  --warn: 245 166 35;
+  --info: 56 189 248;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .4);
+  --shadow-2: 0 8px 24px rgb(0 0 0 / .45);
+}
+
+body { @apply bg-bg text-ink font-sans antialiased; }
+:focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 6px; }

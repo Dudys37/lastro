@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/ui/Basicos.tsx","./src/features/auth/Auth.tsx","./src/features/workspaces/Workspaces.tsx","./src/lib/dinheiro.test.ts","./src/lib/dinheiro.ts","./src/lib/firebase.ts","./src/lib/tema.ts","./src/types/dominio.ts"],"version":"5.9.3"}
