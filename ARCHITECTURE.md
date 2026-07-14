@@ -142,6 +142,42 @@ vírgula, BOM p/ Excel, escape correto de aspas/;/quebras, coluna de parcela
 **Dashboard**: a Visão Geral ganhou o gráfico de fluxo dos últimos 6 meses ao
 lado dos cards de saldo consolidado e fatura em aberto.
 
+## F5 — Metas & Investimentos (implementada)
+
+**Metas** (`lib/metas.ts`, pura e testada): valor alvo, prazo opcional
+('YYYY-MM') e aportes como array no doc (adequado à escala; `arrayUnion`/
+`arrayRemove`). `progressoMeta` (total/pct/faltam/concluída) e `ritmoMensal` —
+quanto aportar POR MÊS até o prazo (teto de faltam/meses, contando o mês
+corrente), com estados sem_prazo/concluída/atrasada. UI: cards com barra,
+chip de concluída/prazo vencido, aportes inline com histórico e o ritmo
+sugerido em destaque. Metas são de editor+ (a regra da F0 já previa).
+Decisão: aporte é compromisso de meta, separado do caixa — a dica na UI
+orienta registrar também o movimento em Lançamentos quando houver.
+
+**Investimentos**: NOVA subcoleção `investimentos` (regra adicionada:
+leitura de membro, escrita editor+ — **exige republicar as Rules**). Posições
+manuais (nome, classe, valor atual com carimbo de atualização, nota), total
+investido e distribuição por classe reutilizando o Donut da F4. Escopo v1 é
+manual por decisão de descoberta; integrações (B3/Open Finance) ficam para o
+futuro.
+
+## F6 — Motor de Inteligência (implementada)
+
+**Motor puro** (`lib/inteligencia.ts`): regras recebem um `CtxInteligencia`
+pronto e devolvem `Alerta[]` (uid estável, severidade info/atenção/crítico,
+título, mensagem, rota de navegação) — sem Firestore, sem UI, 48 testes no
+total garantindo cada regra. Famílias implementadas:
+fatura vencida/vence em ≤5 dias (fechada e não paga, pagamento parcial
+considerado) · fatura corrente fecha em ≤3 dias · cartão ≥90% do limite ·
+orçamento ≥80%/estourado · conta negativa · meta com prazo vencido · meta sem
+aportes há 60+ dias · gastos sem categoria no mês. Ordenação por severidade.
+
+**Central de Inteligência** (Visão Geral): monta o contexto (orçamento do
+mês, categorias, metas), clique navega para a página do problema, 💤 adia 7
+dias e ✕ dispensa — persistidos POR usuário+workspace no localStorage
+(decisão: ocultar alerta é preferência pessoal, não estado compartilhado do
+workspace), com "restaurar ocultos". Top 6 por prioridade, resto agregado.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

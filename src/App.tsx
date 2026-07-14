@@ -9,6 +9,9 @@ import { PaginaLancamentos } from './features/financeiro/Lancamentos';
 import { PaginaFaturas } from './features/financeiro/Faturas';
 import { PaginaOrcamentos } from './features/financeiro/Orcamentos';
 import { PaginaRelatorios } from './features/relatorios/PaginaRelatorios';
+import { PaginaMetas } from './features/metas/Metas';
+import { PaginaInvestimentos } from './features/investimentos/Investimentos';
+import { CentralInteligencia } from './features/inteligencia/Central';
 import { listarCartoes } from './features/financeiro/repo';
 import { itensDaFatura, mesFatura, pagamentosDaFatura } from './lib/faturas';
 import { hojeISO, mesDe } from './lib/lancamentos';
@@ -31,6 +34,8 @@ const MENU = [
   { rota: '/contas', rotulo: 'Contas & Cartões', icone: '💳' },
   { rota: '/faturas', rotulo: 'Faturas', icone: '🧾' },
   { rota: '/orcamentos', rotulo: 'Orçamentos', icone: '🎯' },
+  { rota: '/metas', rotulo: 'Metas', icone: '🏁' },
+  { rota: '/investimentos', rotulo: 'Investimentos', icone: '📊' },
   { rota: '/relatorios', rotulo: 'Relatórios', icone: '📈' },
   { rota: '/membros', rotulo: 'Membros', icone: '👥' },
 ];
@@ -66,6 +71,7 @@ function VisaoGeral() {
           gerencie contas, cartões e categorias em Contas & Cartões.
         </p>
       </Cartao>
+      <CentralInteligencia contas={contas} cartoes={cartoes} lancs={lancs} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Cartao className="relative overflow-hidden p-5">
           <span className="absolute inset-x-0 top-0 h-1 bg-pos" aria-hidden />
@@ -139,6 +145,8 @@ function Shell() {
           <Route path="/contas" element={<PaginaContasCartoes />} />
           <Route path="/faturas" element={<PaginaFaturas />} />
           <Route path="/orcamentos" element={<PaginaOrcamentos />} />
+          <Route path="/metas" element={<PaginaMetas />} />
+          <Route path="/investimentos" element={<PaginaInvestimentos />} />
           <Route path="/relatorios" element={<PaginaRelatorios />} />
           <Route path="/membros" element={<PaginaMembros />} />
         </Routes>
