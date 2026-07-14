@@ -10,6 +10,7 @@ import { db } from '../../lib/firebase';
 import { dividirParcelas } from '../../lib/dinheiro';
 import { datasParcelas } from '../../lib/lancamentos';
 import type { Cartao, Centavos, Conta, Lancamento, TipoLancamento } from '../../types/dominio';
+import { cicloDaFatura } from '../../lib/faturas';
 
 const col = (ws: string, nome: string) => collection(db, 'workspaces', ws, nome);
 const ref = (ws: string, nome: string, id: string) => doc(db, 'workspaces', ws, nome, id);
@@ -131,6 +132,7 @@ export async function criarLancamento(ws: string, uid: string, n: NovoLancamento
       contaDestinoId: n.contaDestinoId,
       cartaoId: n.cartaoId,
       parcelas: nP > 1 ? { total: nP, numero: i + 1, grupoId } : null,
+      faturaMes: null,
       criadoPor: uid,
       criadoEm: Date.now(),
     });
@@ -153,4 +155,53 @@ export async function excluirGrupoParcelas(ws: string, grupoId: string): Promise
   const b = writeBatch(db);
   s.docs.forEach((d) => b.delete(d.ref));
   await b.commit();
+}
+
+// ── F3: faturas e orçamentos ─────────────────────────────────────────
+
+/** Lançamentos do CICLO de uma fatura (range por data; filtro do cartão no
+ *  cliente — evita exigir índice composto no Firestore). */
+export async function listarLancamentosDoCiclo(ws: string, mesFat: string, diaFechamento: number): Promise<Lancamento[]> {
+  const { inicio, fim } = cicloDaFatura(mesFat, diaFechamento);
+  const q = query(col(ws, 'lancamentos'),
+    where('data', '>=', inicio), where('data', '<=', fim), orderBy('data', 'asc'));
+  const s2 = await getDocs(q);
+  return s2.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Lancamento, 'id'>) }));
+}
+
+/** Pagamentos registrados de um cartão (todas as faturas). */
+export async function listarPagamentosDoCartao(ws: string, cartaoId: string): Promise<Lancamento[]> {
+  const q = query(col(ws, 'lancamentos'), where('tipo', '==', 'pagamento'), where('cartaoId', '==', cartaoId));
+  const s2 = await getDocs(q);
+  return s2.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Lancamento, 'id'>) }));
+}
+
+export async function registrarPagamentoFatura(ws: string, uid: string, p: {
+  cartaoId: string; faturaMes: string; contaId: string; valor: Centavos; dataISO: string; descricao: string;
+}): Promise<void> {
+  await setDoc(doc(col(ws, 'lancamentos')), {
+    tipo: 'pagamento' as TipoLancamento,
+    descricao: p.descricao,
+    valor: p.valor,
+    data: p.dataISO,
+    categoriaId: null, contaId: p.contaId, contaDestinoId: null,
+    cartaoId: p.cartaoId, parcelas: null, faturaMes: p.faturaMes,
+    criadoPor: uid, criadoEm: Date.now(),
+  });
+}
+
+/** Orçamento do mês: um doc por mês, mapa { categoriaId: teto em centavos }. */
+export async function obterOrcamento(ws: string, mes: string): Promise<Record<string, Centavos>> {
+  const snap = await getDocs(query(col(ws, 'orcamentos'), where('__name__', '==', mes)));
+  const d = snap.docs[0];
+  return d ? ((d.data().valores ?? {}) as Record<string, Centavos>) : {};
+}
+export async function salvarTetoCategoria(ws: string, mes: string, categoriaId: string, teto: Centavos): Promise<void> {
+  await setDoc(ref(ws, 'orcamentos', mes), { valores: { [categoriaId]: teto } }, { merge: true });
+}
+export async function copiarOrcamento(ws: string, deMes: string, paraMes: string): Promise<number> {
+  const valores = await obterOrcamento(ws, deMes);
+  const n = Object.keys(valores).length;
+  if (n > 0) await setDoc(ref(ws, 'orcamentos', paraMes), { valores }, { merge: true });
+  return n;
 }

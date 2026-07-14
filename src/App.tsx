@@ -6,6 +6,12 @@ import { CriarPrimeiroWorkspace, WorkspaceProvider, useWorkspace } from './featu
 import { PaginaAceitarConvite, PaginaMembros } from './features/membros/Membros';
 import { PaginaContasCartoes } from './features/financeiro/ContasCartoes';
 import { PaginaLancamentos } from './features/financeiro/Lancamentos';
+import { PaginaFaturas } from './features/financeiro/Faturas';
+import { PaginaOrcamentos } from './features/financeiro/Orcamentos';
+import { listarCartoes } from './features/financeiro/repo';
+import { itensDaFatura, mesFatura, pagamentosDaFatura } from './lib/faturas';
+import { hojeISO } from './lib/lancamentos';
+import type { Cartao as CartaoTipo } from './types/dominio';
 import { listarContas, listarTodosLancamentos } from './features/financeiro/repo';
 import { formatarBRL } from './lib/dinheiro';
 import { saldoDaConta } from './lib/lancamentos';
@@ -20,36 +26,33 @@ const MENU = [
   { rota: '/', rotulo: 'Visão Geral', icone: '📊' },
   { rota: '/lancamentos', rotulo: 'Lançamentos', icone: '💸' },
   { rota: '/contas', rotulo: 'Contas & Cartões', icone: '💳' },
+  { rota: '/faturas', rotulo: 'Faturas', icone: '🧾' },
   { rota: '/orcamentos', rotulo: 'Orçamentos', icone: '🎯' },
   { rota: '/membros', rotulo: 'Membros', icone: '👥' },
 ];
-
-function EmBreve({ titulo, fase }: { titulo: string; fase: string }) {
-  return (
-    <Cartao className="p-10 text-center">
-      <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand/10 text-2xl">🧱</div>
-      <h2 className="text-lg font-bold">{titulo}</h2>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-ink2">
-        Este módulo chega na {fase} do plano de construção do Lastro.
-      </p>
-    </Cartao>
-  );
-}
 
 function VisaoGeral() {
   const { ativo } = useWorkspace();
   const [contas, setContas] = useState<Conta[]>([]);
   const [lancs, setLancs] = useState<Lancamento[]>([]);
+  const [cartoes, setCartoes] = useState<CartaoTipo[]>([]);
   useEffect(() => {
     (async () => {
       if (!ativo) return;
       try {
-        const [c, l] = await Promise.all([listarContas(ativo.id), listarTodosLancamentos(ativo.id)]);
-        setContas(c); setLancs(l);
+        const [c, l, k] = await Promise.all([listarContas(ativo.id), listarTodosLancamentos(ativo.id), listarCartoes(ativo.id)]);
+        setContas(c); setLancs(l); setCartoes(k);
       } catch { /* leitor sem rede etc. — cards ficam zerados */ }
     })();
   }, [ativo]);
   const consolidado = contas.reduce((s, c) => s + saldoDaConta(c, lancs), 0);
+  // fatura corrente (aberta hoje) somada de todos os cartões, descontando pagamentos
+  const faturaAberta = cartoes.reduce((s, k) => {
+    const mf = mesFatura(hojeISO(), k.diaFechamento);
+    const tot = itensDaFatura(k, mf, lancs).reduce((a, i) => a + i.valor, 0);
+    const pago = pagamentosDaFatura(k.id, mf, lancs).reduce((a, p) => a + p.valor, 0);
+    return s + Math.max(0, tot - pago);
+  }, 0);
   return (
     <div className="grid gap-4">
       <Cartao className="p-6">
@@ -66,13 +69,18 @@ function VisaoGeral() {
           <div className={`mt-2 text-2xl font-extrabold ${consolidado < 0 ? 'text-neg' : ''}`}>{formatarBRL(consolidado)}</div>
           <div className="mt-1 text-[11px] text-ink3">{contas.length} conta(s)</div>
         </Cartao>
-        {([['Fatura do mês', 'F3', 'bg-warn'], ['Orçamento usado', 'F3', 'bg-info']] as const).map(([t, f, cor]) => (
-          <Cartao key={t} className="relative overflow-hidden p-5">
-            <span className={`absolute inset-x-0 top-0 h-1 ${cor}`} aria-hidden />
-            <div className="text-xs font-bold uppercase tracking-wide text-ink2">{t}</div>
-            <div className="mt-2 text-2xl font-extrabold text-ink3">— {f}</div>
-          </Cartao>
-        ))}
+        <Cartao className="relative overflow-hidden p-5">
+          <span className="absolute inset-x-0 top-0 h-1 bg-warn" aria-hidden />
+          <div className="text-xs font-bold uppercase tracking-wide text-ink2">Fatura em aberto</div>
+          <div className="mt-2 text-2xl font-extrabold">{formatarBRL(faturaAberta)}</div>
+          <div className="mt-1 text-[11px] text-ink3">{cartoes.length} cartão(ões) · ciclo atual</div>
+        </Cartao>
+        <Cartao className="relative overflow-hidden p-5">
+          <span className="absolute inset-x-0 top-0 h-1 bg-info" aria-hidden />
+          <div className="text-xs font-bold uppercase tracking-wide text-ink2">Orçamentos</div>
+          <div className="mt-2 text-2xl font-extrabold">🎯</div>
+          <div className="mt-1 text-[11px] text-ink3">defina tetos por categoria na aba Orçamentos</div>
+        </Cartao>
       </div>
     </div>
   );
@@ -117,7 +125,8 @@ function Shell() {
           <Route path="/" element={<VisaoGeral />} />
           <Route path="/lancamentos" element={<PaginaLancamentos />} />
           <Route path="/contas" element={<PaginaContasCartoes />} />
-          <Route path="/orcamentos" element={<EmBreve titulo="Orçamentos" fase="F3" />} />
+          <Route path="/faturas" element={<PaginaFaturas />} />
+          <Route path="/orcamentos" element={<PaginaOrcamentos />} />
           <Route path="/membros" element={<PaginaMembros />} />
         </Routes>
       </main>

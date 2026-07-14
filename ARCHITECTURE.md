@@ -95,6 +95,32 @@ da F1 já cobriam o núcleo financeiro — **nenhuma mudança de regras nesta fa
 completo — adequado ao volume pessoal/pequena equipe; snapshot de saldo
 incremental é otimização anotada para fase futura.
 
+## F3 — Faturas & Orçamentos (implementada)
+
+**Fatura por ciclo real** (`src/lib/faturas.ts`, pura e testada): a fatura é
+identificada pelo mês de FECHAMENTO; compra com dia ≤ diaFechamento entra na
+fatura do mês, senão empurra para a seguinte (`mesFatura`). Vencimento no
+mesmo mês quando vence depois de fechar, senão no seguinte. `cicloDaFatura`
+usa aritmética real de datas (borda 28/fev × bissexto testada). Status:
+aberta → fechada → parcial → paga.
+
+**Pagamento de fatura é tipo próprio** (`'pagamento'`): DEBITA a conta
+(`saldoDaConta`) mas NÃO conta como despesa (`resumoLancamentos`) — as
+despesas já contaram na data de cada compra. Invariante testada: comprar no
+cartão e pagar a fatura debita a conta uma única vez e registra a despesa uma
+única vez. Página de Faturas: seletor de cartão, navegação por mês de fatura,
+itens do ciclo com badge de parcela, pagamentos listados e registro de
+pagamento com valor sugerido = restante (pagamento parcial suportado).
+
+**Orçamentos**: doc por mês (`orcamentos/{YYYY-MM}`, mapa
+categoriaId→centavos), consumo por competência da compra (cartão INCLUÍDO —
+orçamento mede consumo, não caixa), barra com faixas 80%/100%, estouro
+destacado, "sem categoria" apontado e cópia do mês anterior. Consultas de
+ciclo filtram cartão no cliente para não exigir índice composto.
+
+**Sem mudança de regras**: `lancamentos` (editor+) cobre o tipo 'pagamento' e
+`orcamentos` (admin+ escreve, membro lê) já existia desde a F0.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

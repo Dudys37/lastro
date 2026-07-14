@@ -51,7 +51,9 @@ export interface Convite {
 }
 
 // ── Núcleo financeiro (contratos da F2+, definidos já para orientar o schema) ──
-export type TipoLancamento = 'receita' | 'despesa' | 'transferencia';
+export type TipoLancamento = 'receita' | 'despesa' | 'transferencia' | 'pagamento';
+// 'pagamento' = pagamento de fatura de cartão: DEBITA a conta mas NÃO é
+// despesa nova — as despesas já foram contadas na data de cada compra.
 
 export interface Conta {
   id: string;
@@ -82,6 +84,7 @@ export interface Lancamento {
   contaDestinoId: string | null;   // só transferência
   cartaoId: string | null;         // despesa no cartão → entra na fatura
   parcelas: { total: number; numero: number; grupoId: string } | null;
+  faturaMes: string | null;        // 'YYYY-MM' da fatura paga (só tipo 'pagamento')
   criadoPor: string;
   criadoEm: number;
 }

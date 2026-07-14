@@ -44,6 +44,7 @@ export function saldoDaConta(conta: Conta, lancs: Lancamento[]): Centavos {
   for (const l of lancs) {
     if (l.tipo === 'receita' && l.contaId === conta.id) s += l.valor;
     else if (l.tipo === 'despesa' && l.contaId === conta.id && !l.cartaoId) s -= l.valor;
+    else if (l.tipo === 'pagamento' && l.contaId === conta.id) s -= l.valor; // paga a fatura
     else if (l.tipo === 'transferencia') {
       if (l.contaId === conta.id) s -= l.valor;
       if (l.contaDestinoId === conta.id) s += l.valor;
@@ -58,7 +59,8 @@ export function resumoLancamentos(lancs: Lancamento[]): { receitas: Centavos; de
   for (const l of lancs) {
     if (l.tipo === 'receita') receitas += l.valor;
     else if (l.tipo === 'despesa') despesas += l.valor;
-    // transferências não são receita nem despesa — só movem dinheiro de lugar
+    // transferências e pagamentos de fatura não são receita nem despesa —
+    // só movem dinheiro (as despesas do cartão já contaram na data da compra) de lugar
   }
   return { receitas, despesas, saldo: receitas - despesas };
 }
