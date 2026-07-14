@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { AuthProvider, PaginaLogin, useAuth } from './features/auth/Auth';
 import { CriarPrimeiroWorkspace, WorkspaceProvider, useWorkspace } from './features/workspaces/Workspaces';
+import { PaginaAceitarConvite, PaginaMembros } from './features/membros/Membros';
 import { Botao, Cartao, Marca } from './components/ui/Basicos';
 import { alternarTema, aplicarTema, temaAtual } from './lib/tema';
 
@@ -96,7 +97,7 @@ function Shell() {
           <Route path="/lancamentos" element={<EmBreve titulo="Lançamentos" fase="F2" />} />
           <Route path="/contas" element={<EmBreve titulo="Contas & Cartões" fase="F2" />} />
           <Route path="/orcamentos" element={<EmBreve titulo="Orçamentos" fase="F3" />} />
-          <Route path="/membros" element={<EmBreve titulo="Membros & Convites" fase="F1" />} />
+          <Route path="/membros" element={<PaginaMembros />} />
         </Routes>
       </main>
     </div>
@@ -106,10 +107,15 @@ function Shell() {
 function Portao() {
   const { usuario, carregando } = useAuth();
   if (carregando) return <div className="grid min-h-screen place-items-center text-ink2">Carregando…</div>;
-  if (!usuario) return <PaginaLogin />;
+  if (!usuario) return <PaginaLogin />; // após logar, o hash (#/convite/…) é preservado
   return (
     <WorkspaceProvider>
-      <PortaoWorkspace />
+      <Routes>
+        {/* aceite de convite ANTES do portão de onboarding: um convidado
+            recém-chegado tem zero workspaces e precisa alcançar esta rota */}
+        <Route path="/convite/:id" element={<PaginaAceitarConvite />} />
+        <Route path="*" element={<PortaoWorkspace />} />
+      </Routes>
     </WorkspaceProvider>
   );
 }

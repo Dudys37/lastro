@@ -46,6 +46,29 @@ disciplina de fases testadas e documentadas, escape/validação como regra.
 Abandonado: estado global único `D`, handlers inline, HTML monolítico,
 papéis hardcoded no cliente.
 
+## F1 — Membros & Convites (implementada)
+
+**Fluxo do convite**: admin+ gera link `#/convite/{id}` (token aleatório do
+Firestore, não-enumerável) com papel definido (nunca 'dono'), validade de 7
+dias e uso único. O aceite é uma **transação do cliente**: cria o doc de
+membro (carregando `conviteId`), adiciona o uid ao espelho `membrosUids` e
+marca o convite como usado — tudo ou nada.
+
+**Segurança sem Cloud Functions** (plano gratuito): as Rules validam a
+transação com `get()` (convite válido/na validade/papel idêntico) e
+`existsAfter()` (o update do espelho só passa se o doc de membro existir ao
+FIM da transação). As duas regras se travam mutuamente: não dá para entrar no
+espelho sem membro válido, nem criar membro sem convite válido.
+
+**Proteções de papel** (espelhadas em `podeAlterarMembro`, testada em
+`convites.test.ts`): ninguém gere a si mesmo; ninguém mexe no dono; ninguém
+promove a dono; admin não gere outro admin (só o dono); sair do workspace é
+ação própria e o dono não sai (posse não fica órfã — transferência de posse é
+fluxo futuro deliberado). Diffs de `membrosUids` são exatos (±1, o próprio uid).
+
+**Rota**: `/convite/:id` renderiza ANTES do portão de onboarding — convidado
+novo (zero workspaces) alcança o aceite; o hash sobrevive ao login.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

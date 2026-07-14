@@ -37,6 +37,6 @@ deploy gratuito no GitHub Pages via GitHub Actions.
 
 ## Fases
 
-F0 fundação (este código) → F1 membros & convites → F2 contas, cartões e
+F0 fundação → **F1 membros & convites (implementada)** → F2 contas, cartões e
 lançamentos → F3 faturas & orçamentos → F4 dashboard & relatórios →
 F5 metas & investimentos → F6 motor de inteligência. Detalhes em `ARCHITECTURE.md`.

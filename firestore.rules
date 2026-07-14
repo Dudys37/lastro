@@ -1,7 +1,8 @@
 rules_version = '2';
-// ═══ LASTRO — Regras Firestore (F0/F1) ═══
-// O modelo de papéis vive AQUI (servidor); o cliente apenas espelha (PODE em
-// dominio.ts). Papéis: dono > admin > editor > leitor.
+// ═══ LASTRO — Regras Firestore (F1: Membros & Convites) ═══
+// Papéis: dono > admin > editor > leitor. A fronteira de segurança é AQUI.
+// O aceite de convite é uma transação do cliente validada por get()/existsAfter():
+// funciona no plano gratuito, sem Cloud Functions.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,33 +17,90 @@ service cloud.firestore {
     function pelomenosEditor(ws) { return souMembro(ws) && meuPapel(ws) in ['dono','admin','editor']; }
     function pelomenosAdmin(ws)  { return souMembro(ws) && meuPapel(ws) in ['dono','admin']; }
     function souDono(ws)         { return souMembro(ws) && meuPapel(ws) == 'dono'; }
+    function donoDoWs(ws) {
+      return get(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor;
+    }
+    function convite(id) {
+      return get(/databases/$(database)/documents/convites/$(id)).data;
+    }
 
     match /workspaces/{ws} {
-      // criar: qualquer autenticado, desde que se registre como único membro-espelho
+      // criar: autenticado, registrando-se como único membro-espelho
       allow create: if autenticado()
         && request.resource.data.criadoPor == request.auth.uid
         && request.resource.data.membrosUids == [request.auth.uid];
-      // get = abrir 1 doc (membro); list = consulta "meus workspaces".
-      // Regras de LIST precisam ser prováveis pelo filtro da própria query —
-      // por isso validam contra membrosUids, exatamente o campo filtrado.
+
       allow get: if souMembro(ws);
+      // LIST precisa ser provável pelo filtro da query (membrosUids)
       allow list: if autenticado() && request.auth.uid in resource.data.membrosUids;
-      // atualizar nome/config: admin+; membrosUids só muda em fluxos de membros (F1: via convite)
-      allow update: if pelomenosAdmin(ws);
+
+      // update: admin+ (config) OU auto-entrada por convite OU saída própria.
+      // As duas últimas só podem tocar membrosUids, com diff exato de 1 uid (o próprio).
+      allow update: if pelomenosAdmin(ws)
+        || _entradaPorConvite(ws)
+        || _saidaPropria(ws);
       allow delete: if souDono(ws);
+
+      function _soMudouMembros() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['membrosUids']);
+      }
+      function _entradaPorConvite(ws) {
+        // adiciona exatamente o próprio uid; o doc de membro deve existir AO FIM
+        // da transação (existsAfter) — e a criação desse doc, abaixo, exige um
+        // convite válido. As duas regras se travam mutuamente.
+        return autenticado()
+          && _soMudouMembros()
+          && !(request.auth.uid in resource.data.membrosUids)
+          && (request.auth.uid in request.resource.data.membrosUids)
+          && request.resource.data.membrosUids.size() == resource.data.membrosUids.size() + 1
+          && request.resource.data.membrosUids.hasAll(resource.data.membrosUids)
+          && existsAfter(/databases/$(database)/documents/workspaces/$(ws)/membros/$(request.auth.uid));
+      }
+      function _saidaPropria(ws) {
+        // remove exatamente o próprio uid; dono não sai (posse não fica órfã)
+        return souMembro(ws)
+          && request.auth.uid != donoDoWs(ws)
+          && _soMudouMembros()
+          && !(request.auth.uid in request.resource.data.membrosUids)
+          && request.resource.data.membrosUids.size() == resource.data.membrosUids.size() - 1
+          && resource.data.membrosUids.hasAll(request.resource.data.membrosUids);
+      }
 
       match /membros/{uid} {
         allow read: if souMembro(ws);
-        // bootstrap: o criador grava a si mesmo como dono junto da criação
-        allow create: if autenticado() && uid == request.auth.uid
-          && request.resource.data.papel == 'dono'
-          && get(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor == request.auth.uid;
-        // gestão de papéis: admin+ (F1 refina: dono não pode ser rebaixado por admin)
-        allow update, delete: if pelomenosAdmin(ws) && uid != get(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor;
+
+        // criar: (a) bootstrap — o criador grava a si mesmo como dono;
+        //        (b) aceite de convite — válido, do mesmo ws, papel idêntico.
+        allow create: if autenticado() && uid == request.auth.uid && (
+          ( request.resource.data.papel == 'dono'
+            && get(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor == request.auth.uid )
+          ||
+          ( request.resource.data.conviteId is string
+            && convite(request.resource.data.conviteId).workspaceId == ws
+            && convite(request.resource.data.conviteId).usado == false
+            && convite(request.resource.data.conviteId).expiraEm > request.time.toMillis()
+            && request.resource.data.papel == convite(request.resource.data.conviteId).papel )
+        );
+
+        // gerir papel: admin+; nunca a si mesmo; nunca o dono; nunca promover a
+        // dono; admin não mexe em outro admin (só o dono pode).
+        allow update: if pelomenosAdmin(ws)
+          && uid != request.auth.uid
+          && uid != donoDoWs(ws)
+          && request.resource.data.papel in ['admin','editor','leitor']
+          && (meuPapel(ws) == 'dono' || resource.data.papel != 'admin');
+
+        // remover: admin+ com as mesmas proteções, OU sair (a si mesmo, exceto dono)
+        allow delete: if
+          ( pelomenosAdmin(ws)
+            && uid != request.auth.uid
+            && uid != donoDoWs(ws)
+            && (meuPapel(ws) == 'dono' || resource.data.papel != 'admin') )
+          ||
+          ( autenticado() && uid == request.auth.uid && uid != donoDoWs(ws) );
       }
 
-      // Núcleo financeiro (F2+): leitura p/ membros; escrita p/ editor+;
-      // configuração (contas/cartões/categorias/orçamentos) p/ admin+.
+      // Núcleo financeiro (F2+)
       match /lancamentos/{id} { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); }
       match /contas/{id}      { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
       match /cartoes/{id}     { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
@@ -51,11 +109,26 @@ service cloud.firestore {
       match /metas/{id}       { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); }
     }
 
-    // Convites (F1): criados por admin+ do workspace; aceite via Cloud Function
-    // ou transação validada — detalhado na F1.
     match /convites/{id} {
-      allow create: if autenticado() && pelomenosAdmin(request.resource.data.workspaceId);
-      allow read: if autenticado();
+      // criar: admin+ do workspace; nunca concede 'dono'; nasce não-usado
+      allow create: if autenticado()
+        && pelomenosAdmin(request.resource.data.workspaceId)
+        && request.resource.data.papel in ['admin','editor','leitor']
+        && request.resource.data.criadoPor == request.auth.uid
+        && request.resource.data.usado == false;
+      // abrir por id: o link contém um token aleatório não-enumerável;
+      // list (gestão) só para admin+ do workspace do convite
+      allow get: if autenticado();
+      allow list: if autenticado() && pelomenosAdmin(resource.data.workspaceId);
+      // marcar como usado: só o aceitante, só se ainda válido, só esses campos
+      allow update: if autenticado()
+        && resource.data.usado == false
+        && request.time.toMillis() < resource.data.expiraEm
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usado','usadoPor'])
+        && request.resource.data.usado == true
+        && request.resource.data.usadoPor == request.auth.uid;
+      // revogar: admin+ do workspace
+      allow delete: if autenticado() && pelomenosAdmin(resource.data.workspaceId);
     }
   }
 }
