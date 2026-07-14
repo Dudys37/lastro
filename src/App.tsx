@@ -8,9 +8,12 @@ import { PaginaContasCartoes } from './features/financeiro/ContasCartoes';
 import { PaginaLancamentos } from './features/financeiro/Lancamentos';
 import { PaginaFaturas } from './features/financeiro/Faturas';
 import { PaginaOrcamentos } from './features/financeiro/Orcamentos';
+import { PaginaRelatorios } from './features/relatorios/PaginaRelatorios';
 import { listarCartoes } from './features/financeiro/repo';
 import { itensDaFatura, mesFatura, pagamentosDaFatura } from './lib/faturas';
-import { hojeISO } from './lib/lancamentos';
+import { hojeISO, mesDe } from './lib/lancamentos';
+import { serieFluxoMensal, ultimosMeses } from './lib/relatorios';
+import { BarrasFluxo } from './features/relatorios/Graficos';
 import type { Cartao as CartaoTipo } from './types/dominio';
 import { listarContas, listarTodosLancamentos } from './features/financeiro/repo';
 import { formatarBRL } from './lib/dinheiro';
@@ -28,6 +31,7 @@ const MENU = [
   { rota: '/contas', rotulo: 'Contas & Cartões', icone: '💳' },
   { rota: '/faturas', rotulo: 'Faturas', icone: '🧾' },
   { rota: '/orcamentos', rotulo: 'Orçamentos', icone: '🎯' },
+  { rota: '/relatorios', rotulo: 'Relatórios', icone: '📈' },
   { rota: '/membros', rotulo: 'Membros', icone: '👥' },
 ];
 
@@ -82,6 +86,14 @@ function VisaoGeral() {
           <div className="mt-1 text-[11px] text-ink3">defina tetos por categoria na aba Orçamentos</div>
         </Cartao>
       </div>
+      <Cartao className="p-5">
+        <div className="mb-3 flex items-center gap-4 text-xs font-bold text-ink2">
+          <span>Fluxo dos últimos 6 meses</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-pos" /> receitas</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-neg" /> despesas</span>
+        </div>
+        <BarrasFluxo dados={serieFluxoMensal(lancs, ultimosMeses(6, mesDe(hojeISO())))} />
+      </Cartao>
     </div>
   );
 }
@@ -127,6 +139,7 @@ function Shell() {
           <Route path="/contas" element={<PaginaContasCartoes />} />
           <Route path="/faturas" element={<PaginaFaturas />} />
           <Route path="/orcamentos" element={<PaginaOrcamentos />} />
+          <Route path="/relatorios" element={<PaginaRelatorios />} />
           <Route path="/membros" element={<PaginaMembros />} />
         </Routes>
       </main>

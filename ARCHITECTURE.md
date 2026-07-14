@@ -121,6 +121,27 @@ ciclo filtram cartão no cliente para não exigir índice composto.
 **Sem mudança de regras**: `lancamentos` (editor+) cobre o tipo 'pagamento' e
 `orcamentos` (admin+ escreve, membro lê) já existia desde a F0.
 
+## F4 — Dashboard & Relatórios (implementada)
+
+**Gráficos SVG à mão, zero dependências** (`features/relatorios/Graficos.tsx`):
+barras duplas de fluxo (receitas × despesas), linha/área da evolução do saldo
+consolidado (com linha de zero quando há negativo) e donut de categorias com
+legenda. Cores 100% via tokens — os dois temas funcionam de graça; tooltips
+nativos via `<title>`; `role="img"` + `aria-label` para acessibilidade.
+
+**Séries em lógica pura testada** (`lib/relatorios.ts`): `ultimosMeses`,
+`serieFluxoMensal` (competência; transferências/pagamentos fora),
+`serieSaldoConsolidado` (saldo ao fim de cada mês, histórico acumulado) e
+`topCategorias`. Página de Relatórios com período 3/6/12 meses e donut do mês
+corrente (top 6 + agregado das menores).
+
+**Exportação CSV pt-BR** (`gerarCSV`, testada): separador `;`, decimal com
+vírgula, BOM p/ Excel, escape correto de aspas/;/quebras, coluna de parcela
+`n/total`. Download client-side por Blob.
+
+**Dashboard**: a Visão Geral ganhou o gráfico de fluxo dos últimos 6 meses ao
+lado dos cards de saldo consolidado e fatura em aberto.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.
