@@ -4,6 +4,13 @@ import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { AuthProvider, PaginaLogin, useAuth } from './features/auth/Auth';
 import { CriarPrimeiroWorkspace, WorkspaceProvider, useWorkspace } from './features/workspaces/Workspaces';
 import { PaginaAceitarConvite, PaginaMembros } from './features/membros/Membros';
+import { PaginaContasCartoes } from './features/financeiro/ContasCartoes';
+import { PaginaLancamentos } from './features/financeiro/Lancamentos';
+import { listarContas, listarTodosLancamentos } from './features/financeiro/repo';
+import { formatarBRL } from './lib/dinheiro';
+import { saldoDaConta } from './lib/lancamentos';
+import { useEffect } from 'react';
+import type { Conta, Lancamento } from './types/dominio';
 import { Botao, Cartao, Marca } from './components/ui/Basicos';
 import { alternarTema, aplicarTema, temaAtual } from './lib/tema';
 
@@ -31,23 +38,37 @@ function EmBreve({ titulo, fase }: { titulo: string; fase: string }) {
 
 function VisaoGeral() {
   const { ativo } = useWorkspace();
+  const [contas, setContas] = useState<Conta[]>([]);
+  const [lancs, setLancs] = useState<Lancamento[]>([]);
+  useEffect(() => {
+    (async () => {
+      if (!ativo) return;
+      try {
+        const [c, l] = await Promise.all([listarContas(ativo.id), listarTodosLancamentos(ativo.id)]);
+        setContas(c); setLancs(l);
+      } catch { /* leitor sem rede etc. — cards ficam zerados */ }
+    })();
+  }, [ativo]);
+  const consolidado = contas.reduce((s, c) => s + saldoDaConta(c, lancs), 0);
   return (
     <div className="grid gap-4">
       <Cartao className="p-6">
         <h1 className="text-xl font-extrabold tracking-tight">Bem-vindo ao {ativo?.nome ?? 'Lastro'} ⚓</h1>
         <p className="mt-1 text-sm text-ink2">
-          Fundação (F0) pronta: autenticação, workspaces com papéis, dois temas e testes.
-          A F2 traz contas, cartões e lançamentos com parcelamento exato em centavos.
+          Lance receitas, despesas (à vista ou parceladas) e transferências em Lançamentos;
+          gerencie contas, cartões e categorias em Contas & Cartões.
         </p>
       </Cartao>
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          ['Saldo consolidado', 'F2', 'pos'],
-          ['Fatura do mês', 'F3', 'warn'],
-          ['Orçamento usado', 'F3', 'info'],
-        ].map(([t, f, cor]) => (
+        <Cartao className="relative overflow-hidden p-5">
+          <span className="absolute inset-x-0 top-0 h-1 bg-pos" aria-hidden />
+          <div className="text-xs font-bold uppercase tracking-wide text-ink2">Saldo consolidado</div>
+          <div className={`mt-2 text-2xl font-extrabold ${consolidado < 0 ? 'text-neg' : ''}`}>{formatarBRL(consolidado)}</div>
+          <div className="mt-1 text-[11px] text-ink3">{contas.length} conta(s)</div>
+        </Cartao>
+        {([['Fatura do mês', 'F3', 'bg-warn'], ['Orçamento usado', 'F3', 'bg-info']] as const).map(([t, f, cor]) => (
           <Cartao key={t} className="relative overflow-hidden p-5">
-            <span className={`absolute inset-x-0 top-0 h-1 bg-${cor}`} aria-hidden />
+            <span className={`absolute inset-x-0 top-0 h-1 ${cor}`} aria-hidden />
             <div className="text-xs font-bold uppercase tracking-wide text-ink2">{t}</div>
             <div className="mt-2 text-2xl font-extrabold text-ink3">— {f}</div>
           </Cartao>
@@ -94,8 +115,8 @@ function Shell() {
       <main className="flex-1 bg-bg p-4 md:p-8">
         <Routes>
           <Route path="/" element={<VisaoGeral />} />
-          <Route path="/lancamentos" element={<EmBreve titulo="Lançamentos" fase="F2" />} />
-          <Route path="/contas" element={<EmBreve titulo="Contas & Cartões" fase="F2" />} />
+          <Route path="/lancamentos" element={<PaginaLancamentos />} />
+          <Route path="/contas" element={<PaginaContasCartoes />} />
           <Route path="/orcamentos" element={<EmBreve titulo="Orçamentos" fase="F3" />} />
           <Route path="/membros" element={<PaginaMembros />} />
         </Routes>

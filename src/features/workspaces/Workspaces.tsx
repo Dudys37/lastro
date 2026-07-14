@@ -4,7 +4,7 @@
 // nesta feature (padrão repositório — facilita a migração futura de backend).
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
-  addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where,
+  addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { Papel, Workspace } from '../../types/dominio';
@@ -34,11 +34,13 @@ export async function listarMeusWorkspaces(uid: string): Promise<Workspace[]> {
 interface WsCtx {
   workspaces: Workspace[];
   ativo: Workspace | null;
+  /** papel do usuário no workspace ativo (F2) — gates de UI; as Rules são a fronteira real */
+  papel: Papel | null;
   carregando: boolean;
   trocar: (id: string) => void;
   recarregar: () => Promise<void>;
 }
-const Ctx = createContext<WsCtx>({ workspaces: [], ativo: null, carregando: true, trocar: () => {}, recarregar: async () => {} });
+const Ctx = createContext<WsCtx>({ workspaces: [], ativo: null, papel: null, carregando: true, trocar: () => {}, recarregar: async () => {} });
 export const useWorkspace = () => useContext(Ctx);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -65,8 +67,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const ativo = workspaces.find((w) => w.id === ativoId) ?? workspaces[0] ?? null;
   function trocar(id: string) { setAtivoId(id); localStorage.setItem('lastro_ws', id); }
 
+  const [papel, setPapel] = useState<Papel | null>(null);
+  useEffect(() => {
+    (async () => {
+      if (!usuario || !ativo) { setPapel(null); return; }
+      try {
+        const snap = await getDoc(doc(db, 'workspaces', ativo.id, 'membros', usuario.uid));
+        setPapel(snap.exists() ? ((snap.data() as { papel: Papel }).papel ?? null) : null);
+      } catch { setPapel(null); }
+    })();
+  }, [usuario, ativo]);
+
   return (
-    <Ctx.Provider value={{ workspaces, ativo, carregando, trocar, recarregar }}>
+    <Ctx.Provider value={{ workspaces, ativo, papel, carregando, trocar, recarregar }}>
       {children}
     </Ctx.Provider>
   );

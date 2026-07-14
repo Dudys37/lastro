@@ -69,6 +69,32 @@ fluxo futuro deliberado). Diffs de `membrosUids` são exatos (±1, o próprio ui
 **Rota**: `/convite/:id` renderiza ANTES do portão de onboarding — convidado
 novo (zero workspaces) alcança o aceite; o hash sobrevive ao login.
 
+## F2 — Contas, Cartões e Lançamentos (implementada)
+
+**Contas** (corrente/poupança/dinheiro/investimento) com saldo inicial; saldo
+atual calculado por `saldoDaConta` (pura, testada): receitas somam, despesas
+em conta subtraem, **despesa no cartão não toca a conta** (quem paga é a
+fatura, F3) e transferências movem sem criar dinheiro (invariante testada:
+soma dos saldos constante). **Cartões** com limite, dias de fechamento e
+vencimento (1–28) e barra de gasto do mês. **Categorias** por workspace com
+seed padrão idempotente (15 categorias pt-BR) na primeira visita de um admin.
+
+**Lançamentos**: navegação por mês (competência = data), resumo
+receitas/despesas/saldo (transferências ficam de fora — só movem dinheiro),
+formulário com três tipos e **parcelamento**: `dividirParcelas` (soma exata,
+resto nas primeiras) × `datasParcelas` (mensal com clamp de fim de mês —
+31/jan → 28/fev), gravadas em `writeBatch` com `grupoId` comum, tudo ou nada.
+Exclusão individual ou do grupo inteiro de parcelas.
+
+**Papel no contexto**: `WorkspaceProvider` agora expõe `papel` do usuário no
+workspace ativo — gates de UI via `podeFazer` (leitor não vê botões de lançar;
+editor não vê gestão de contas). As Rules seguem sendo a fronteira real, e as
+da F1 já cobriam o núcleo financeiro — **nenhuma mudança de regras nesta fase**.
+
+**Decisão consciente**: `listarTodosLancamentos` para saldos lê o histórico
+completo — adequado ao volume pessoal/pequena equipe; snapshot de saldo
+incremental é otimização anotada para fase futura.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.
