@@ -108,10 +108,23 @@ function Shell() {
   const { usuario, sair } = useAuth();
   const { ativo, workspaces, trocar } = useWorkspace();
   const [tema, setTema] = useState(temaAtual());
+  const [menuAberto, setMenuAberto] = useState(false);
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-60 flex-col border-r border-line bg-card p-4 md:flex">
-        <div className="mb-6 px-1"><Marca /></div>
+      {/* topbar mobile (F8): no celular a sidebar vira gaveta */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-line bg-card px-4 md:hidden">
+        <button aria-label="Abrir menu" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-lg"
+          onClick={() => setMenuAberto(true)}>☰</button>
+        <Marca />
+      </header>
+      {menuAberto && (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" aria-hidden onClick={() => setMenuAberto(false)} />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-line bg-card p-4 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="mb-6 flex items-center justify-between px-1">
+          <Marca />
+          <button aria-label="Fechar menu" className="text-ink3 md:hidden" onClick={() => setMenuAberto(false)}>✕</button>
+        </div>
         {workspaces.length > 1 && (
           <select
             className="mb-4 h-9 rounded-lg border border-line bg-card2 px-2 text-sm"
@@ -122,7 +135,7 @@ function Shell() {
         )}
         <nav className="grid gap-1">
           {MENU.map((m) => (
-            <NavLink key={m.rota} to={m.rota} end={m.rota === '/'}
+            <NavLink key={m.rota} to={m.rota} end={m.rota === '/'} onClick={() => setMenuAberto(false)}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive ? 'bg-brand/10 text-brand' : 'text-ink2 hover:bg-card2 hover:text-ink'}`}>
@@ -138,7 +151,7 @@ function Shell() {
           <Botao variante="fantasma" onClick={() => void sair()}>Sair</Botao>
         </div>
       </aside>
-      <main className="flex-1 bg-bg p-4 md:p-8">
+      <main className="flex-1 bg-bg p-4 pt-[4.5rem] md:p-8 md:pt-8">
         <Routes>
           <Route path="/" element={<VisaoGeral />} />
           <Route path="/lancamentos" element={<PaginaLancamentos />} />

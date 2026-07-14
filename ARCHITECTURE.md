@@ -196,6 +196,21 @@ pendentes/lançadas do mês ("Lançar" individual ou "Lançar todas"); o víncul
 é por `recorrenciaId` no lançamento (badge 🔁), nunca por descrição.
 Nova regra de inteligência: `rec.pendentes` cobra a partir do dia 8.
 
+## F8 — Mobile & PWA (implementada)
+
+**Defeito real corrigido**: a sidebar era `hidden md:flex` SEM alternativa —
+no celular o app não tinha navegação nenhuma (um convidado abrindo o link do
+convite no telefone ficava preso na primeira tela). Agora: topbar fixa mobile
+com ☰, sidebar vira gaveta (overlay + backdrop, fecha ao navegar/tocar fora),
+desktop intocado.
+
+**PWA**: `manifest.webmanifest` (pt-BR, standalone, theme #0D9488), ícones
+gerados programaticamente (âncora branca em tile teal — 192/512/maskável/
+apple-touch) e `favicon.svg` (mata o 404 do console). Service worker
+deliberadamente simples: network-first com fallback ao cache, escopo só na
+origem (Firestore passa direto) — existe para instalabilidade e oscilações de
+rede, **nunca** para servir dado financeiro velho; registrado só em produção.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

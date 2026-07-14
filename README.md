@@ -42,6 +42,6 @@ deploy gratuito no GitHub Pages via GitHub Actions.
 **F3** faturas por ciclo real & orçamentos · **F4** dashboard & relatórios
 (gráficos SVG próprios, CSV pt-BR) · **F5** metas com ritmo mensal &
 investimentos · **F6** motor de inteligência (alertas com adiar/dispensar) ·
-**F7** edição de lançamentos & recorrências.
+**F7** edição de lançamentos & recorrências · **F8** mobile (gaveta de navegação) & PWA instalável.
 
 Todas implementadas e testadas — detalhes e decisões em `ARCHITECTURE.md`.
