@@ -108,6 +108,7 @@ service cloud.firestore {
       match /orcamentos/{id}  { allow read: if souMembro(ws); allow write: if pelomenosAdmin(ws); }
       match /metas/{id}       { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); }
       match /investimentos/{id} { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); } // F5
+      match /recorrencias/{id}  { allow read: if souMembro(ws); allow write: if pelomenosEditor(ws); } // F7
     }
 
     match /convites/{id} {

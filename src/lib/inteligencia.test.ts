@@ -5,14 +5,14 @@ import type { Cartao, Conta, Lancamento } from '../types/dominio';
 const L = (p: Partial<Lancamento>): Lancamento => ({
   id: 'x', tipo: 'despesa', descricao: '', valor: 0, data: '2026-07-10',
   categoriaId: null, contaId: null, contaDestinoId: null, cartaoId: null,
-  parcelas: null, faturaMes: null, criadoPor: 'u', criadoEm: 0, ...p,
+  parcelas: null, faturaMes: null, recorrenciaId: null, criadoPor: 'u', criadoEm: 0, ...p,
 });
 const K = (p: Partial<Cartao>): Cartao => ({ id: 'k1', nome: 'Nu', bandeira: 'MC', limite: 0, diaFechamento: 10, diaVencimento: 17, arquivado: false, ...p });
 const CONTA: Conta = { id: 'c1', nome: 'Corrente', tipo: 'corrente', saldoInicial: 10000, arquivada: false };
 
 const base: CtxInteligencia = {
   hoje: '2026-07-15', contas: [], cartoes: [], lancs: [], tetos: {},
-  nomeCategoria: (id) => id, metas: [],
+  nomeCategoria: (id) => id, metas: [], recorrencias: [],
 };
 const ids = (ctx: Partial<CtxInteligencia>) => runInteligencia({ ...base, ...ctx }).map((a) => a.uid);
 
@@ -49,6 +49,17 @@ describe('limite, orçamento, conta e categoria', () => {
     const r = ids({ contas: [CONTA], lancs });
     expect(r).toContain('conta.negativa:c1');
     expect(r).toContain('sem_categoria:2026-07');
+  });
+});
+
+describe('recorrências pendentes', () => {
+  const rec = { id: 'r1', tipo: 'despesa' as const, descricao: 'Aluguel', valor: 1000, diaDoMes: 5,
+    categoriaId: null, contaId: 'c1', cartaoId: null, ativo: true, criadoPor: 'u' };
+  it('cobra a partir do dia 8; some quando lançada', () => {
+    expect(ids({ recorrencias: [rec], hoje: '2026-07-05' })).not.toContain('rec.pendentes:2026-07');
+    expect(ids({ recorrencias: [rec], hoje: '2026-07-15' })).toContain('rec.pendentes:2026-07');
+    expect(ids({ recorrencias: [rec], hoje: '2026-07-15', lancs: [L({ recorrenciaId: 'r1', data: '2026-07-05' })] }))
+      .not.toContain('rec.pendentes:2026-07');
   });
 });
 

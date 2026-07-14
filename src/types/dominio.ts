@@ -73,6 +73,19 @@ export interface Cartao {
   arquivado: boolean;
 }
 
+export interface Recorrencia {
+  id: string;
+  tipo: 'receita' | 'despesa';
+  descricao: string;
+  valor: Centavos;
+  diaDoMes: number;                // 1–28 (sem ambiguidade de fim de mês)
+  categoriaId: string | null;
+  contaId: string | null;          // OU cartaoId (despesa no cartão)
+  cartaoId: string | null;
+  ativo: boolean;
+  criadoPor: string;
+}
+
 export interface Lancamento {
   id: string;
   tipo: TipoLancamento;
@@ -85,6 +98,7 @@ export interface Lancamento {
   cartaoId: string | null;         // despesa no cartão → entra na fatura
   parcelas: { total: number; numero: number; grupoId: string } | null;
   faturaMes: string | null;        // 'YYYY-MM' da fatura paga (só tipo 'pagamento')
+  recorrenciaId: string | null;    // origem, quando lançado a partir de uma recorrência (F7)
   criadoPor: string;
   criadoEm: number;
 }

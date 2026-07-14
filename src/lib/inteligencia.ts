@@ -9,6 +9,8 @@ import { gastoNoCartaoNoMes, mesDe, saldoDaConta } from './lancamentos';
 import { itensDaFatura, mesFatura, pagamentosDaFatura, vencimentoFatura } from './faturas';
 import { consumoPorCategoria } from './faturas';
 import { progressoMeta, ritmoMensal, type Meta } from './metas';
+import { pendentesDoMes } from './recorrencias';
+import type { Recorrencia } from '../types/dominio';
 
 export type Severidade = 'info' | 'atencao' | 'critico';
 
@@ -29,6 +31,7 @@ export interface CtxInteligencia {
   tetos: Record<string, Centavos>;                // orçamento do mês corrente
   nomeCategoria: (id: string) => string;
   metas: Meta[];
+  recorrencias: Recorrencia[];
 }
 
 const diasEntre = (a: string, b: string) =>
@@ -118,6 +121,18 @@ const regras: Regra[] = [
       titulo: `Meta "${m.nome}" sem aportes há 2+ meses`, msg: `Último aporte em ${new Date(ultimo.data + 'T12:00').toLocaleDateString('pt-BR')} — ${p.pct}% concluída.`, rota: '/metas' }];
     return [];
   }),
+
+  // ── Recorrências pendentes com o mês avançando ──
+  (ctx) => {
+    const dia = Number(ctx.hoje.slice(8, 10));
+    if (dia < 8) return []; // início de mês: sem cobrança
+    const pend = pendentesDoMes(ctx.recorrencias, ctx.lancs, mesDe(ctx.hoje));
+    if (pend.length === 0) return [];
+    const nomes = pend.slice(0, 3).map((r) => r.descricao).join(', ');
+    return [{ uid: `rec.pendentes:${mesDe(ctx.hoje)}`, sev: 'atencao', icone: '🔁',
+      titulo: `${pend.length} recorrência(s) sem lançar este mês`,
+      msg: `${nomes}${pend.length > 3 ? '…' : ''} — lance com um clique em Lançamentos.`, rota: '/lancamentos' }];
+  },
 
   // ── Gastos sem categoria no mês ──
   (ctx) => {

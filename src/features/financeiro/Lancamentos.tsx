@@ -3,16 +3,18 @@
 // parcelado) e lista com edição de descrição/categoria e exclusão
 // (individual ou do grupo inteiro de parcelas).
 import { useEffect, useMemo, useState } from 'react';
-import type { Cartao, Conta, Lancamento, TipoLancamento } from '../../types/dominio';
+import type { Cartao, Conta, Lancamento, Recorrencia, TipoLancamento } from '../../types/dominio';
 import { podeFazer } from '../../types/dominio';
 import { dividirParcelas, formatarBRL, parseBRL } from '../../lib/dinheiro';
 import { hojeISO, mesAnterior, mesDe, mesSeguinte, resumoLancamentos, rotuloMes } from '../../lib/lancamentos';
+import { dataDaRecorrencia, pendentesDoMes } from '../../lib/recorrencias';
 import { useAuth } from '../auth/Auth';
 import { useWorkspace } from '../workspaces/Workspaces';
 import { Botao, Campo, Cartao as Card } from '../../components/ui/Basicos';
 import {
-  Categoria, criarLancamento, excluirGrupoParcelas, excluirLancamento,
-  listarCartoes, listarCategorias, listarContas, listarLancamentosDoMes,
+  Categoria, atualizarLancamento, criarLancamento, excluirGrupoParcelas, excluirLancamento,
+  excluirRecorrencia, lancarRecorrencia, listarCartoes, listarCategorias, listarContas,
+  listarLancamentosDoMes, listarRecorrencias, salvarRecorrencia,
 } from './repo';
 
 export function PaginaLancamentos() {
@@ -23,6 +25,7 @@ export function PaginaLancamentos() {
   const [contas, setContas] = useState<Conta[]>([]);
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [cats, setCats] = useState<Categoria[]>([]);
+  const [recs, setRecs] = useState<Recorrencia[]>([]);
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const lanco = podeFazer(papel, 'lancar');
@@ -31,10 +34,11 @@ export function PaginaLancamentos() {
     if (!ativo) return;
     setErro('');
     try {
-      const [l, c1, c2, c3] = await Promise.all([
-        listarLancamentosDoMes(ativo.id, mes), listarContas(ativo.id), listarCartoes(ativo.id), listarCategorias(ativo.id),
+      const [l, c1, c2, c3, r] = await Promise.all([
+        listarLancamentosDoMes(ativo.id, mes), listarContas(ativo.id), listarCartoes(ativo.id),
+        listarCategorias(ativo.id), listarRecorrencias(ativo.id),
       ]);
-      setLancs(l); setContas(c1); setCartoes(c2); setCats(c3);
+      setLancs(l); setContas(c1); setCartoes(c2); setCats(c3); setRecs(r);
     } catch { setErro('Não foi possível carregar os lançamentos.'); }
   }
   useEffect(() => { void carregar(); /* eslint-disable-next-line */ }, [ativo?.id, mes]);
@@ -73,41 +77,34 @@ export function PaginaLancamentos() {
           onCriar={(n) => void acao(() => criarLancamento(ativo.id, usuario!.uid, n))} />
       )}
 
+      <PainelRecorrencias recs={recs} lancs={lancs} mes={mes} contas={contas} cartoes={cartoes} cats={cats}
+        lanco={lanco} ocupado={ocupado}
+        onLancar={(r) => void acao(() => lancarRecorrencia(ativo.id, usuario!.uid, r, dataDaRecorrencia(r, mes)))}
+        onLancarTodas={(pend) => void acao(async () => {
+          for (const r of pend) await lancarRecorrencia(ativo.id, usuario!.uid, r, dataDaRecorrencia(r, mes));
+        })}
+        onSalvar={(r) => void acao(() => salvarRecorrencia(ativo.id, r))}
+        onExcluir={(id) => void acao(() => excluirRecorrencia(ativo.id, id))} />
+
       <Card>
         {lancs.length === 0 && <p className="px-5 py-8 text-center text-sm text-ink3">Nenhum lançamento em {rotuloMes(mes)}.</p>}
         {lancs.map((l) => (
-          <div key={l.id} className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3 last:border-0">
-            <span className="text-lg" aria-hidden>
-              {l.tipo === 'receita' ? '💰' : l.tipo === 'transferencia' ? '🔁' : cat(l.categoriaId)?.icone ?? '💸'}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold">
-                {l.descricao || (l.tipo === 'transferencia' ? 'Transferência' : cat(l.categoriaId)?.nome ?? 'Lançamento')}
-                {l.parcelas && <span className="ml-2 rounded-full bg-card2 px-2 py-0.5 text-[10px] font-bold text-ink2">{l.parcelas.numero}/{l.parcelas.total}</span>}
-              </div>
-              <div className="truncate text-xs text-ink2">
-                {new Date(l.data + 'T12:00').toLocaleDateString('pt-BR')} ·{' '}
-                {l.tipo === 'transferencia'
-                  ? `${nomeConta(l.contaId)} → ${nomeConta(l.contaDestinoId)}`
-                  : l.cartaoId
-                    ? `💳 ${cartoes.find((k) => k.id === l.cartaoId)?.nome ?? 'cartão'}`
-                    : nomeConta(l.contaId)}
-                {l.categoriaId && l.tipo !== 'transferencia' && ` · ${cat(l.categoriaId)?.nome ?? ''}`}
-              </div>
-            </div>
-            <div className={`text-sm font-extrabold ${l.tipo === 'receita' ? 'text-pos' : l.tipo === 'despesa' ? 'text-neg' : 'text-ink2'}`}>
-              {l.tipo === 'despesa' ? '−' : l.tipo === 'receita' ? '+' : ''}{formatarBRL(l.valor)}
-            </div>
-            {lanco && (
-              <Botao variante="perigo" className="h-8 px-2.5 text-xs" disabled={ocupado} onClick={() => {
-                if (l.parcelas && confirm(`Este lançamento é a parcela ${l.parcelas.numero}/${l.parcelas.total}.\n\nOK = excluir TODAS as ${l.parcelas.total} parcelas\nCancelar = não excluir nada`)) {
-                  void acao(() => excluirGrupoParcelas(ativo.id, l.parcelas!.grupoId));
-                } else if (!l.parcelas && confirm('Excluir este lançamento?')) {
-                  void acao(() => excluirLancamento(ativo.id, l.id));
-                }
-              }}>✕</Botao>
-            )}
-          </div>
+          <LinhaLancamento key={l.id} l={l} cats={cats} lanco={lanco} ocupado={ocupado}
+            legenda={
+              l.tipo === 'transferencia'
+                ? `${nomeConta(l.contaId)} → ${nomeConta(l.contaDestinoId)}`
+                : l.cartaoId
+                  ? `💳 ${cartoes.find((k) => k.id === l.cartaoId)?.nome ?? 'cartão'}`
+                  : nomeConta(l.contaId)}
+            icone={l.tipo === 'receita' ? '💰' : l.tipo === 'transferencia' ? '🔁' : l.tipo === 'pagamento' ? '💵' : cat(l.categoriaId)?.icone ?? '💸'}
+            onSalvar={(campos) => void acao(() => atualizarLancamento(ativo.id, l.id, campos))}
+            onExcluir={() => {
+              if (l.parcelas && confirm(`Este lançamento é a parcela ${l.parcelas.numero}/${l.parcelas.total}.\n\nOK = excluir TODAS as ${l.parcelas.total} parcelas\nCancelar = não excluir nada`)) {
+                void acao(() => excluirGrupoParcelas(ativo.id, l.parcelas!.grupoId));
+              } else if (!l.parcelas && confirm('Excluir este lançamento?')) {
+                void acao(() => excluirLancamento(ativo.id, l.id));
+              }
+            }} />
         ))}
       </Card>
       {erro && <p className="text-xs text-neg">{erro}</p>}
@@ -212,5 +209,175 @@ function Sel({ rotulo, value, onChange, opcoes }: {
         {opcoes.map((o) => <option key={o.v} value={o.v}>{o.r}</option>)}
       </select>
     </label>
+  );
+}
+
+// ── Linha com edição inline (F7) ─────────────────────────────────────
+function LinhaLancamento({ l, cats, lanco, ocupado, legenda, icone, onSalvar, onExcluir }: {
+  l: Lancamento; cats: Categoria[]; lanco: boolean; ocupado: boolean; legenda: string; icone: string;
+  onSalvar: (campos: { descricao?: string; valor?: number; data?: string; categoriaId?: string | null }) => void;
+  onExcluir: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [descricao, setDescricao] = useState('');
+  const [valor, setValor] = useState('');
+  const [data, setData] = useState('');
+  const [categoriaId, setCategoriaId] = useState('');
+  const cent = parseBRL(valor);
+  const catsDoTipo = cats.filter((c) => c.tipo === (l.tipo === 'receita' ? 'receita' : 'despesa'));
+  const cat = (id: string | null) => cats.find((c) => c.id === id);
+  const editavel = lanco && (l.tipo === 'receita' || l.tipo === 'despesa'); // transf./pagamento: excluir e refazer
+
+  if (editando) {
+    return (
+      <div className="flex flex-wrap items-end gap-2 border-b border-line bg-card2/40 px-5 py-3 last:border-0">
+        <Campo rotulo="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} className="h-9 w-44" />
+        <Campo rotulo="Valor" value={valor} onChange={(e) => setValor(e.target.value)} className="h-9 w-28"
+          erro={valor && cent === null ? 'inválido' : undefined} />
+        <Campo rotulo="Data" type="date" value={data} onChange={(e) => setData(e.target.value)} className="h-9 w-40" />
+        <Sel rotulo="Categoria" value={categoriaId} onChange={setCategoriaId}
+          opcoes={[{ v: '', r: 'Sem categoria' }, ...catsDoTipo.map((c) => ({ v: c.id, r: `${c.icone} ${c.nome}` }))]} />
+        <Botao className="h-9 px-3 text-xs" disabled={ocupado || cent === null || !data}
+          onClick={() => { onSalvar({ descricao: descricao.trim(), valor: cent!, data, categoriaId: categoriaId || null }); setEditando(false); }}>
+          Salvar
+        </Botao>
+        <Botao variante="fantasma" className="h-9 px-3 text-xs" onClick={() => setEditando(false)}>Cancelar</Botao>
+        {l.parcelas && <p className="w-full text-[11px] text-ink3">Editando SÓ a parcela {l.parcelas.numero}/{l.parcelas.total} — as demais não mudam.</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3 last:border-0">
+      <span className="text-lg" aria-hidden>{icone}</span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold">
+          {l.descricao || (l.tipo === 'transferencia' ? 'Transferência' : cat(l.categoriaId)?.nome ?? 'Lançamento')}
+          {l.parcelas && <span className="ml-2 rounded-full bg-card2 px-2 py-0.5 text-[10px] font-bold text-ink2">{l.parcelas.numero}/{l.parcelas.total}</span>}
+          {l.recorrenciaId && <span className="ml-2 rounded-full bg-card2 px-2 py-0.5 text-[10px] font-bold text-ink2">🔁</span>}
+        </div>
+        <div className="truncate text-xs text-ink2">
+          {new Date(l.data + 'T12:00').toLocaleDateString('pt-BR')} · {legenda}
+          {l.categoriaId && l.tipo !== 'transferencia' && ` · ${cat(l.categoriaId)?.nome ?? ''}`}
+        </div>
+      </div>
+      <div className={`text-sm font-extrabold ${l.tipo === 'receita' ? 'text-pos' : l.tipo === 'despesa' ? 'text-neg' : 'text-ink2'}`}>
+        {l.tipo === 'despesa' ? '−' : l.tipo === 'receita' ? '+' : ''}{formatarBRL(l.valor)}
+      </div>
+      {editavel && (
+        <Botao variante="fantasma" className="h-8 px-2.5 text-xs" disabled={ocupado} onClick={() => {
+          setDescricao(l.descricao ?? ''); setValor(String(l.valor / 100).replace('.', ',')); setData(l.data); setCategoriaId(l.categoriaId ?? ''); setEditando(true);
+        }}>✎</Botao>
+      )}
+      {lanco && <Botao variante="perigo" className="h-8 px-2.5 text-xs" disabled={ocupado} onClick={onExcluir}>✕</Botao>}
+    </div>
+  );
+}
+
+// ── Painel de recorrências do mês (F7) ───────────────────────────────
+function PainelRecorrencias({ recs, lancs, mes, contas, cartoes, cats, lanco, ocupado, onLancar, onLancarTodas, onSalvar, onExcluir }: {
+  recs: Recorrencia[]; lancs: Lancamento[]; mes: string;
+  contas: Conta[]; cartoes: Cartao[]; cats: Categoria[]; lanco: boolean; ocupado: boolean;
+  onLancar: (r: Recorrencia) => void; onLancarTodas: (pend: Recorrencia[]) => void;
+  onSalvar: (r: Omit<Recorrencia, 'id'> & { id?: string }) => void; onExcluir: (id: string) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [gerindo, setGerindo] = useState(false);
+  const pend = pendentesDoMes(recs, lancs, mes);
+  if (recs.length === 0 && !lanco) return null;
+
+  return (
+    <Card>
+      <button className="flex w-full items-center gap-2 px-5 py-3.5 text-left" onClick={() => setAberto(!aberto)}>
+        <span className="text-sm font-bold">🔁 Recorrências</span>
+        {pend.length > 0
+          ? <span className="rounded-full bg-warn/10 px-2 py-0.5 text-[11px] font-bold text-warn">{pend.length} pendente(s) no mês</span>
+          : recs.length > 0 && <span className="rounded-full bg-pos/10 px-2 py-0.5 text-[11px] font-bold text-pos">mês em dia ✓</span>}
+        <span className="ml-auto text-ink3">{aberto ? '▴' : '▾'}</span>
+      </button>
+      {aberto && (
+        <div className="border-t border-line">
+          {recs.length === 0 && <p className="px-5 py-5 text-center text-xs text-ink3">Cadastre aluguel, salário, assinaturas — e lance o mês com um clique.</p>}
+          {recs.map((r) => {
+            const pendente = pend.some((p) => p.id === r.id);
+            return (
+              <div key={r.id} className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5 text-sm last:border-0">
+                <span className={r.ativo ? '' : 'opacity-50'}>
+                  {r.tipo === 'receita' ? '💰' : '💸'} <strong>{r.descricao}</strong>
+                  <span className="ml-2 text-xs text-ink2">dia {r.diaDoMes} · {formatarBRL(r.valor)}
+                    {r.cartaoId ? ` · 💳 ${cartoes.find((k) => k.id === r.cartaoId)?.nome ?? ''}` : r.contaId ? ` · ${contas.find((c) => c.id === r.contaId)?.nome ?? ''}` : ''}
+                  </span>
+                  {!r.ativo && <span className="ml-2 text-[10px] font-bold text-ink3">pausada</span>}
+                </span>
+                <span className="ml-auto flex items-center gap-2">
+                  {lanco && r.ativo && (pendente
+                    ? <Botao className="h-8 px-2.5 text-xs" disabled={ocupado} onClick={() => onLancar(r)}>Lançar no mês</Botao>
+                    : <span className="text-[11px] font-bold text-pos">lançada ✓</span>)}
+                  {lanco && gerindo && (
+                    <>
+                      <Botao variante="fantasma" className="h-8 px-2.5 text-xs" disabled={ocupado}
+                        onClick={() => onSalvar({ ...r, ativo: !r.ativo })}>{r.ativo ? 'Pausar' : 'Reativar'}</Botao>
+                      <Botao variante="perigo" className="h-8 px-2.5 text-xs" disabled={ocupado}
+                        onClick={() => { if (confirm(`Excluir a recorrência "${r.descricao}"? Lançamentos já feitos permanecem.`)) onExcluir(r.id); }}>✕</Botao>
+                    </>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+          {lanco && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
+              {pend.length > 1 && <Botao className="h-9 px-3 text-xs" disabled={ocupado} onClick={() => onLancarTodas(pend)}>Lançar todas ({pend.length})</Botao>}
+              <FormRecorrencia contas={contas} cartoes={cartoes} cats={cats} ocupado={ocupado} onSalvar={onSalvar} />
+              <button className="ml-auto text-[11px] font-semibold text-ink3 hover:text-ink" onClick={() => setGerindo(!gerindo)}>
+                {gerindo ? 'concluir gestão' : 'gerenciar'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function FormRecorrencia({ contas, cartoes, cats, ocupado, onSalvar }: {
+  contas: Conta[]; cartoes: Cartao[]; cats: Categoria[]; ocupado: boolean;
+  onSalvar: (r: Omit<Recorrencia, 'id'>) => void;
+}) {
+  const { usuario } = useAuth();
+  const [aberto, setAberto] = useState(false);
+  const [tipo, setTipo] = useState<'receita' | 'despesa'>('despesa');
+  const [descricao, setDescricao] = useState('');
+  const [valor, setValor] = useState('');
+  const [dia, setDia] = useState('5');
+  const [categoriaId, setCategoriaId] = useState('');
+  const [origem, setOrigem] = useState('');
+  const cent = parseBRL(valor);
+  const ehCartao = origem.startsWith('cartao:');
+  const catsDoTipo = cats.filter((c) => c.tipo === tipo);
+  if (!aberto) return <Botao variante="fantasma" className="h-9 px-3 text-xs" onClick={() => setAberto(true)}>+ Nova recorrência</Botao>;
+  return (
+    <div className="flex w-full flex-wrap items-end gap-2 pt-1">
+      <Sel rotulo="Tipo" value={tipo} onChange={(v) => { setTipo(v as 'receita' | 'despesa'); setOrigem(''); }}
+        opcoes={[{ v: 'despesa', r: '💸 Despesa' }, { v: 'receita', r: '💰 Receita' }]} />
+      <Campo rotulo="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Aluguel, Netflix…" className="h-9 w-40" />
+      <Campo rotulo="Valor" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" className="h-9 w-24"
+        erro={valor && cent === null ? 'inválido' : undefined} />
+      <Campo rotulo="Dia (1–28)" type="number" min={1} max={28} value={dia} onChange={(e) => setDia(e.target.value)} className="h-9 w-20" />
+      <Sel rotulo="Categoria" value={categoriaId} onChange={setCategoriaId}
+        opcoes={[{ v: '', r: 'Sem categoria' }, ...catsDoTipo.map((c) => ({ v: c.id, r: `${c.icone} ${c.nome}` }))]} />
+      <Sel rotulo={tipo === 'receita' ? 'Recebe em' : 'Paga com'} value={origem} onChange={setOrigem}
+        opcoes={[{ v: '', r: 'Selecione…' },
+          ...contas.map((c) => ({ v: c.id, r: `🏦 ${c.nome}` })),
+          ...(tipo === 'despesa' ? cartoes.map((k) => ({ v: `cartao:${k.id}`, r: `💳 ${k.nome}` })) : [])]} />
+      <Botao className="h-9 px-3 text-xs" disabled={ocupado || !descricao.trim() || cent === null || cent <= 0 || !origem}
+        onClick={() => {
+          onSalvar({ tipo, descricao: descricao.trim(), valor: cent!, diaDoMes: Math.min(28, Math.max(1, parseInt(dia) || 1)),
+            categoriaId: categoriaId || null, contaId: ehCartao ? null : origem, cartaoId: ehCartao ? origem.slice(7) : null,
+            ativo: true, criadoPor: usuario?.uid ?? '' });
+          setAberto(false); setDescricao(''); setValor('');
+        }}>Salvar</Botao>
+      <Botao variante="fantasma" className="h-9 px-3 text-xs" onClick={() => setAberto(false)}>Cancelar</Botao>
+    </div>
   );
 }

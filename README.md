@@ -35,8 +35,13 @@ deploy gratuito no GitHub Pages via GitHub Actions.
 - Dois temas por design tokens (`src/styles/tokens.css`); componentes não
   conhecem cores, só tokens.
 
-## Fases
+## Fases — 🎉 roadmap v1 completo
 
-F0 fundação → **F1 membros & convites (implementada)** → F2 contas, cartões e
-lançamentos → F3 faturas & orçamentos → F4 dashboard & relatórios →
-F5 metas & investimentos → F6 motor de inteligência. Detalhes em `ARCHITECTURE.md`.
+**F0** fundação (auth, workspaces, temas, CI) · **F1** membros & convites ·
+**F2** contas, cartões, categorias e lançamentos com parcelas exatas ·
+**F3** faturas por ciclo real & orçamentos · **F4** dashboard & relatórios
+(gráficos SVG próprios, CSV pt-BR) · **F5** metas com ritmo mensal &
+investimentos · **F6** motor de inteligência (alertas com adiar/dispensar) ·
+**F7** edição de lançamentos & recorrências.
+
+Todas implementadas e testadas — detalhes e decisões em `ARCHITECTURE.md`.

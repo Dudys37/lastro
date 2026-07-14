@@ -10,7 +10,8 @@ import { aplicarOcultos, runInteligencia, type Alerta, type Ocultos, type Severi
 import { useAuth } from '../auth/Auth';
 import { useWorkspace } from '../workspaces/Workspaces';
 import { Cartao as Card } from '../../components/ui/Basicos';
-import { Categoria, listarCategorias, obterOrcamento } from '../financeiro/repo';
+import { Categoria, listarCategorias, listarRecorrencias, obterOrcamento } from '../financeiro/repo';
+import type { Recorrencia } from '../../types/dominio';
 import { listarMetas } from '../metas/Metas';
 import type { Meta } from '../../lib/metas';
 
@@ -31,6 +32,7 @@ export function CentralInteligencia({ contas, cartoes, lancs }: {
   const [tetos, setTetos] = useState<Record<string, number>>({});
   const [cats, setCats] = useState<Categoria[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [recs, setRecs] = useState<Recorrencia[]>([]);
   const chave = `lastro_intel_${ativo?.id ?? ''}_${usuario?.uid ?? ''}`;
   const [ocultos, setOcultos] = useState<Ocultos>({ dispensados: {}, adiados: {} });
 
@@ -43,18 +45,18 @@ export function CentralInteligencia({ contas, cartoes, lancs }: {
     (async () => {
       if (!ativo) return;
       try {
-        const [t, c, m] = await Promise.all([
-          obterOrcamento(ativo.id, mesDe(hojeISO())), listarCategorias(ativo.id), listarMetas(ativo.id),
+        const [t, c, m, r] = await Promise.all([
+          obterOrcamento(ativo.id, mesDe(hojeISO())), listarCategorias(ativo.id), listarMetas(ativo.id), listarRecorrencias(ativo.id),
         ]);
-        setTetos(t); setCats(c); setMetas(m);
+        setTetos(t); setCats(c); setMetas(m); setRecs(r);
       } catch { /* sem dados extras, o motor roda com o que tiver */ }
     })();
   }, [ativo]);
 
   const alertas = useMemo(() => runInteligencia({
-    hoje: hojeISO(), contas, cartoes, lancs, tetos, metas,
+    hoje: hojeISO(), contas, cartoes, lancs, tetos, metas, recorrencias: recs,
     nomeCategoria: (id) => { const c = cats.find((x) => x.id === id); return c ? `${c.icone} ${c.nome}` : 'categoria'; },
-  }), [contas, cartoes, lancs, tetos, metas, cats]);
+  }), [contas, cartoes, lancs, tetos, metas, cats, recs]);
 
   const agora = Date.now();
   const visiveis = aplicarOcultos(alertas, ocultos, agora);

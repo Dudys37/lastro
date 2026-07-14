@@ -178,6 +178,24 @@ dias e ✕ dispensa — persistidos POR usuário+workspace no localStorage
 (decisão: ocultar alerta é preferência pessoal, não estado compartilhado do
 workspace), com "restaurar ocultos". Top 6 por prioridade, resto agregado.
 
+## F7 — Edição de lançamentos & Recorrências (implementada)
+
+**Edição inline**: receitas e despesas editam descrição/valor/data/categoria
+na própria linha (✎); editar uma parcela altera SÓ ela (avisado na UI);
+transferências e pagamentos de fatura são excluir-e-refazer por design (mexer
+em duas pontas exigiria fluxo próprio).
+
+**Recorrências** (contas fixas — NOVA subcoleção `recorrencias`, regra
+editor+ adicionada: **exige republicar as Rules**): tipo, descrição, valor,
+dia do mês (1–28, sem ambiguidade de fim de mês), categoria e conta/cartão;
+pausar/reativar/excluir. **Materialização é manual de um clique** — decisão
+alinhada ao "lançamento manual, simples e confiável" da descoberta: nada
+entra nos números sem confirmação humana, sem corrida entre dispositivos e
+sem escrita implícita. O painel na página de Lançamentos mostra
+pendentes/lançadas do mês ("Lançar" individual ou "Lançar todas"); o vínculo
+é por `recorrenciaId` no lançamento (badge 🔁), nunca por descrição.
+Nova regra de inteligência: `rec.pendentes` cobra a partir do dia 8.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

@@ -9,7 +9,7 @@ import {
 import { db } from '../../lib/firebase';
 import { dividirParcelas } from '../../lib/dinheiro';
 import { datasParcelas } from '../../lib/lancamentos';
-import type { Cartao, Centavos, Conta, Lancamento, TipoLancamento } from '../../types/dominio';
+import type { Cartao, Centavos, Conta, Lancamento, Recorrencia, TipoLancamento } from '../../types/dominio';
 import { cicloDaFatura } from '../../lib/faturas';
 
 const col = (ws: string, nome: string) => collection(db, 'workspaces', ws, nome);
@@ -112,6 +112,7 @@ export interface NovoLancamento {
   contaDestinoId: string | null;
   cartaoId: string | null;
   nParcelas: number;             // 1 = à vista
+  recorrenciaId?: string | null; // vínculo quando lançado de uma recorrência (F7)
 }
 
 export async function criarLancamento(ws: string, uid: string, n: NovoLancamento): Promise<void> {
@@ -133,6 +134,7 @@ export async function criarLancamento(ws: string, uid: string, n: NovoLancamento
       cartaoId: n.cartaoId,
       parcelas: nP > 1 ? { total: nP, numero: i + 1, grupoId } : null,
       faturaMes: null,
+      recorrenciaId: n.recorrenciaId ?? null,
       criadoPor: uid,
       criadoEm: Date.now(),
     });
@@ -204,4 +206,27 @@ export async function copiarOrcamento(ws: string, deMes: string, paraMes: string
   const n = Object.keys(valores).length;
   if (n > 0) await setDoc(ref(ws, 'orcamentos', paraMes), { valores }, { merge: true });
   return n;
+}
+
+// ── F7: recorrências (contas fixas) ──────────────────────────────────
+export async function listarRecorrencias(ws: string): Promise<Recorrencia[]> {
+  const s2 = await getDocs(col(ws, 'recorrencias'));
+  return s2.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Recorrencia, 'id'>) }))
+    .sort((a, b) => a.diaDoMes - b.diaDoMes || a.descricao.localeCompare(b.descricao, 'pt-BR'));
+}
+export async function salvarRecorrencia(ws: string, r: Omit<Recorrencia, 'id'> & { id?: string }): Promise<void> {
+  const id = r.id ?? doc(col(ws, 'recorrencias')).id;
+  const { id: _ignora, ...dados } = r;
+  await setDoc(ref(ws, 'recorrencias', id), dados);
+}
+export async function excluirRecorrencia(ws: string, id: string): Promise<void> {
+  await deleteDoc(ref(ws, 'recorrencias', id));
+}
+/** Materializa a recorrência no mês: cria o lançamento vinculado. */
+export async function lancarRecorrencia(ws: string, uid: string, r: Recorrencia, dataISO: string): Promise<void> {
+  await criarLancamento(ws, uid, {
+    tipo: r.tipo, descricao: r.descricao, valorTotal: r.valor, dataPrimeira: dataISO,
+    categoriaId: r.categoriaId, contaId: r.contaId, contaDestinoId: null,
+    cartaoId: r.cartaoId, nParcelas: 1, recorrenciaId: r.id,
+  });
 }
