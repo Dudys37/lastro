@@ -134,8 +134,8 @@ export function PaginaImportarOFX() {
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink2">Lançar em</span>
               <select className="h-10 rounded-lg border border-line bg-card px-2 text-sm" value={destino} onChange={(e) => setDestino(e.target.value)}>
                 <option value="">Selecione o destino…</option>
-                {contas.map((c) => <option key={c.id} value={c.id}>🏦 {c.nome}</option>)}
-                {cartoes.map((k) => <option key={k.id} value={`cartao:${k.id}`}>💳 {k.nome}</option>)}
+                {contas.filter((c) => !c.arquivada).map((c) => <option key={c.id} value={c.id}>🏦 {c.nome}</option>)}
+                {cartoes.filter((k) => !k.arquivado).map((k) => <option key={k.id} value={`cartao:${k.id}`}>💳 {k.nome}</option>)}
               </select>
             </label>
             <label className="flex h-10 items-center gap-2 text-xs font-semibold text-ink2">

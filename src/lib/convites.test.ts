@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validarConvite, podeAlterarMembro, podeSair, PAPEIS_CONVIDAVEIS } from './convites';
+import { validarConvite, podeAlterarMembro, podeSair, podeTransferirPosse, PAPEIS_CONVIDAVEIS } from './convites';
 
 const base = { workspaceId: 'w1', papel: 'editor', usado: false, expiraEm: 1000 };
 
@@ -43,5 +43,14 @@ describe('podeSair e papéis conviáveis', () => {
   });
   it('convite nunca concede dono', () => {
     expect(PAPEIS_CONVIDAVEIS).not.toContain('dono');
+  });
+});
+
+describe('podeTransferirPosse (F11)', () => {
+  it('só o dono, para outro membro', () => {
+    expect(podeTransferirPosse('dono', 'b', 'a', true)).toBe(true);
+    expect(podeTransferirPosse('admin', 'b', 'a', true)).toBe(false);
+    expect(podeTransferirPosse('dono', 'a', 'a', true)).toBe(false);   // a si mesmo, não
+    expect(podeTransferirPosse('dono', 'b', 'a', false)).toBe(false);  // não-membro, não
   });
 });

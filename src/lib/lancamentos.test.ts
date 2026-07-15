@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addMesesISO, datasParcelas, mesDe, saldoDaConta, resumoLancamentos, gastoNoCartaoNoMes, mesAnterior, mesSeguinte } from './lancamentos';
+import { addMesesISO, datasParcelas, mesDe, saldoConsolidado, saldoDaConta, resumoLancamentos, gastoNoCartaoNoMes, mesAnterior, mesSeguinte } from './lancamentos';
 import { dividirParcelas } from './dinheiro';
 import type { Conta, Lancamento } from '../types/dominio';
 
@@ -70,5 +70,13 @@ describe('integração parcelas: valores × datas', () => {
     const datas = datasParcelas('2026-12-31', 3);
     expect(vals.reduce((a, b) => a + b, 0)).toBe(10000);
     expect(datas).toEqual(['2026-12-31', '2027-01-31', '2027-02-28']);
+  });
+});
+
+describe('saldoConsolidado (F11)', () => {
+  it('exclui contas arquivadas', () => {
+    const ativa: Conta = { id: 'a', nome: 'A', tipo: 'corrente', saldoInicial: 1000, arquivada: false };
+    const arquivada: Conta = { id: 'b', nome: 'B', tipo: 'corrente', saldoInicial: 500, arquivada: true };
+    expect(saldoConsolidado([ativa, arquivada], [])).toBe(1000);
   });
 });

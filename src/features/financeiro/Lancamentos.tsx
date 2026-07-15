@@ -213,12 +213,12 @@ function FormLancamento({ contas, cartoes, cats, ocupado, onCriar }: {
         <Sel rotulo={tipo === 'transferencia' ? 'De (origem)' : tipo === 'receita' ? 'Recebe em' : 'Paga com'} value={origem} onChange={setOrigem}
           opcoes={[
             { v: '', r: 'Selecione…' },
-            ...contas.map((c) => ({ v: c.id, r: `🏦 ${c.nome}` })),
-            ...(tipo === 'despesa' ? cartoes.map((k) => ({ v: `cartao:${k.id}`, r: `💳 ${k.nome}` })) : []),
+            ...contas.filter((c) => !c.arquivada).map((c) => ({ v: c.id, r: `🏦 ${c.nome}` })),
+            ...(tipo === 'despesa' ? cartoes.filter((k) => !k.arquivado).map((k) => ({ v: `cartao:${k.id}`, r: `💳 ${k.nome}` })) : []),
           ]} />
         {tipo === 'transferencia' && (
           <Sel rotulo="Para (destino)" value={contaDestinoId} onChange={setContaDestinoId}
-            opcoes={[{ v: '', r: 'Selecione…' }, ...contas.filter((c) => c.id !== origem).map((c) => ({ v: c.id, r: `🏦 ${c.nome}` }))]} />
+            opcoes={[{ v: '', r: 'Selecione…' }, ...contas.filter((c) => !c.arquivada && c.id !== origem).map((c) => ({ v: c.id, r: `🏦 ${c.nome}` }))]} />
         )}
         {podeParcelar && (
           <Sel rotulo="Parcelas" value={String(nParcelas)} onChange={(v) => setNParcelas(parseInt(v))}
@@ -404,8 +404,8 @@ function FormRecorrencia({ contas, cartoes, cats, ocupado, onSalvar }: {
         opcoes={[{ v: '', r: 'Sem categoria' }, ...catsDoTipo.map((c) => ({ v: c.id, r: `${c.icone} ${c.nome}` }))]} />
       <Sel rotulo={tipo === 'receita' ? 'Recebe em' : 'Paga com'} value={origem} onChange={setOrigem}
         opcoes={[{ v: '', r: 'Selecione…' },
-          ...contas.map((c) => ({ v: c.id, r: `🏦 ${c.nome}` })),
-          ...(tipo === 'despesa' ? cartoes.map((k) => ({ v: `cartao:${k.id}`, r: `💳 ${k.nome}` })) : [])]} />
+          ...contas.filter((c) => !c.arquivada).map((c) => ({ v: c.id, r: `🏦 ${c.nome}` })),
+          ...(tipo === 'despesa' ? cartoes.filter((k) => !k.arquivado).map((k) => ({ v: `cartao:${k.id}`, r: `💳 ${k.nome}` })) : [])]} />
       <Botao className="h-9 px-3 text-xs" disabled={ocupado || !descricao.trim() || cent === null || cent <= 0 || !origem}
         onClick={() => {
           onSalvar({ tipo, descricao: descricao.trim(), valor: cent!, diaDoMes: Math.min(28, Math.max(1, parseInt(dia) || 1)),

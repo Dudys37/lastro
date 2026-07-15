@@ -50,3 +50,8 @@ export function podeAlterarMembro(
 export function podeSair(papel: Papel): boolean {
   return papel !== 'dono';
 }
+
+/** Transferência de posse (F11): só o dono, para OUTRO membro atual. */
+export function podeTransferirPosse(meuPapel: Papel, alvoUid: string, meuUid: string, alvoEMembro: boolean): boolean {
+  return meuPapel === 'dono' && alvoEMembro && alvoUid !== meuUid;
+}

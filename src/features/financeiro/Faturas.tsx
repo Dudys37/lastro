@@ -168,7 +168,7 @@ function FormPagamento({ contas, restante, ocupado, onPagar }: {
         <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink2">Debitar de</span>
         <select className="h-10 rounded-lg border border-line bg-card px-2 text-sm" value={contaId} onChange={(e) => setContaId(e.target.value)}>
           <option value="">Selecione a conta…</option>
-          {contas.map((c) => <option key={c.id} value={c.id}>🏦 {c.nome}</option>)}
+          {contas.filter((c) => !c.arquivada).map((c) => <option key={c.id} value={c.id}>🏦 {c.nome}</option>)}
         </select>
       </label>
       <Campo rotulo="Valor" value={valor} onChange={(e) => setValor(e.target.value)} placeholder={formatarBRL(restante)}

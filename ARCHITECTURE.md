@@ -249,6 +249,27 @@ gravação em batches de 400 (limite do Firestore é 500). Importados chegam
 sem categoria de propósito — a busca '📦 Sem categoria' (F9) é a esteira de
 classificação. Sem mudança de regras.
 
+## F11 — Administração & Ciclo de vida (implementada)
+
+**Endurecimento de segurança** (achado em revisão — **exige republicar as
+Rules**): a regra de update do workspace permitia a um ADMIN alterar
+`criadoPor` e "roubar" a posse. Agora: admin edita config (`_posseIntacta`),
+e a posse só muda pela **transferência transacional do dono** — três
+escritas amarradas por `getAfter` (workspace.criadoPor + novo dono vira
+'dono' + antigo vira 'admin'); o workspace nunca fica sem dono e o alvo
+precisa ser membro atual. Lógica de UI em `podeTransferirPosse` (testada).
+
+**Página ⚙️ Workspace**: renomear (admin+), transferir posse (dono, com
+confirmação) e excluir workspace (dono, confirmação DIGITANDO o nome).
+Exclusão limpa as 9 subcoleções em lotes de 400 antes do doc-mãe — Firestore
+não apaga subcoleções sozinho; a limpeza é retomável se falhar no meio.
+
+**Arquivamento de contas/cartões** (campos existiam desde a F2, agora com
+UI): Arquivar/Reativar em Contas & Cartões com seção recolhida 🗄️;
+arquivadas somem dos formulários de lançamento/recorrência/pagamento/
+importação, mas PERMANECEM na barra de busca (histórico é legítimo) e o
+consolidado passa a somar só ativas (`saldoConsolidado`, testada).
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

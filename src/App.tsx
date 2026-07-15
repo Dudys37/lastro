@@ -9,6 +9,7 @@ import { PaginaLancamentos } from './features/financeiro/Lancamentos';
 import { PaginaFaturas } from './features/financeiro/Faturas';
 import { PaginaOrcamentos } from './features/financeiro/Orcamentos';
 import { PaginaImportarOFX } from './features/financeiro/ImportarOFX';
+import { PaginaWorkspace } from './features/workspaces/Configuracoes';
 import { PaginaRelatorios } from './features/relatorios/PaginaRelatorios';
 import { PaginaMetas } from './features/metas/Metas';
 import { PaginaInvestimentos } from './features/investimentos/Investimentos';
@@ -21,7 +22,7 @@ import { BarrasFluxo } from './features/relatorios/Graficos';
 import type { Cartao as CartaoTipo } from './types/dominio';
 import { listarContas, listarTodosLancamentos } from './features/financeiro/repo';
 import { formatarBRL } from './lib/dinheiro';
-import { saldoDaConta } from './lib/lancamentos';
+import { saldoConsolidado } from './lib/lancamentos';
 import { useEffect } from 'react';
 import type { Conta, Lancamento } from './types/dominio';
 import { Botao, Cartao, Marca } from './components/ui/Basicos';
@@ -40,6 +41,7 @@ const MENU = [
   { rota: '/relatorios', rotulo: 'Relatórios', icone: '📈' },
   { rota: '/importar', rotulo: 'Importar OFX', icone: '📥' },
   { rota: '/membros', rotulo: 'Membros', icone: '👥' },
+  { rota: '/workspace', rotulo: 'Workspace', icone: '⚙️' },
 ];
 
 function VisaoGeral() {
@@ -56,7 +58,7 @@ function VisaoGeral() {
       } catch { /* leitor sem rede etc. — cards ficam zerados */ }
     })();
   }, [ativo]);
-  const consolidado = contas.reduce((s, c) => s + saldoDaConta(c, lancs), 0);
+  const consolidado = saldoConsolidado(contas, lancs);
   // fatura corrente (aberta hoje) somada de todos os cartões, descontando pagamentos
   const faturaAberta = cartoes.reduce((s, k) => {
     const mf = mesFatura(hojeISO(), k.diaFechamento);
@@ -79,7 +81,7 @@ function VisaoGeral() {
           <span className="absolute inset-x-0 top-0 h-1 bg-pos" aria-hidden />
           <div className="text-xs font-bold uppercase tracking-wide text-ink2">Saldo consolidado</div>
           <div className={`mt-2 text-2xl font-extrabold ${consolidado < 0 ? 'text-neg' : ''}`}>{formatarBRL(consolidado)}</div>
-          <div className="mt-1 text-[11px] text-ink3">{contas.length} conta(s)</div>
+          <div className="mt-1 text-[11px] text-ink3">{contas.filter((c) => !c.arquivada).length} conta(s) ativa(s)</div>
         </Cartao>
         <Cartao className="relative overflow-hidden p-5">
           <span className="absolute inset-x-0 top-0 h-1 bg-warn" aria-hidden />
@@ -165,6 +167,7 @@ function Shell() {
           <Route path="/relatorios" element={<PaginaRelatorios />} />
           <Route path="/importar" element={<PaginaImportarOFX />} />
           <Route path="/membros" element={<PaginaMembros />} />
+          <Route path="/workspace" element={<PaginaWorkspace />} />
         </Routes>
       </main>
     </div>

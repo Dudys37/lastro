@@ -57,7 +57,7 @@ export function PaginaContasCartoes() {
           {configuro && <FormConta onSalvar={(c) => void acao(() => salvarConta(ativo.id, c))} ocupado={ocupado} />}
         </div>
         {contas.length === 0 && <p className="px-5 py-6 text-center text-sm text-ink3">Nenhuma conta ainda — crie a primeira acima.</p>}
-        {contas.map((c) => (
+        {contas.filter((c) => !c.arquivada).map((c) => (
           <div key={c.id} className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3 last:border-0">
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold">{c.nome}</div>
@@ -70,13 +70,22 @@ export function PaginaContasCartoes() {
               <div className="text-[11px] text-ink3">inicial {formatarBRL(c.saldoInicial)}</div>
             </div>
             {configuro && (
-              <Botao variante="perigo" className="h-8 px-3 text-xs" disabled={ocupado}
-                onClick={() => { if (confirm(`Excluir a conta "${c.nome}"? Os lançamentos dela permanecem no histórico.`)) void acao(() => excluirConta(ativo.id, c.id)); }}>
-                Excluir
-              </Botao>
+              <>
+                <Botao variante="fantasma" className="h-8 px-3 text-xs" disabled={ocupado}
+                  onClick={() => void acao(() => salvarConta(ativo.id, { ...c, arquivada: true }))}>
+                  Arquivar
+                </Botao>
+                <Botao variante="perigo" className="h-8 px-3 text-xs" disabled={ocupado}
+                  onClick={() => { if (confirm(`Excluir a conta "${c.nome}"? Os lançamentos dela permanecem no histórico.`)) void acao(() => excluirConta(ativo.id, c.id)); }}>
+                  Excluir
+                </Botao>
+              </>
             )}
           </div>
         ))}
+        <Arquivadas itens={contas.filter((c) => c.arquivada).map((c) => ({ id: c.id, rotulo: `${c.nome} · ${formatarBRL(saldoDaConta(c, lancs))}` }))}
+          configuro={configuro} ocupado={ocupado}
+          onReativar={(id) => { const c = contas.find((x) => x.id === id)!; void acao(() => salvarConta(ativo.id, { ...c, arquivada: false })); }} />
       </Card>
 
       {/* ── Cartões ── */}
@@ -86,7 +95,7 @@ export function PaginaContasCartoes() {
           {configuro && <FormCartao onSalvar={(c) => void acao(() => salvarCartao(ativo.id, c))} ocupado={ocupado} />}
         </div>
         {cartoes.length === 0 && <p className="px-5 py-6 text-center text-sm text-ink3">Nenhum cartão ainda.</p>}
-        {cartoes.map((k) => {
+        {cartoes.filter((k) => !k.arquivado).map((k) => {
           const gasto = gastoNoCartaoNoMes(k.id, mesAtual, lancs);
           const pct = k.limite > 0 ? Math.min(100, Math.round((gasto / k.limite) * 100)) : 0;
           return (
@@ -101,10 +110,16 @@ export function PaginaContasCartoes() {
                   <div className="text-[11px] text-ink3">gasto no mês (fatura por ciclo chega na F3)</div>
                 </div>
                 {configuro && (
-                  <Botao variante="perigo" className="h-8 px-3 text-xs" disabled={ocupado}
-                    onClick={() => { if (confirm(`Excluir o cartão "${k.nome}"?`)) void acao(() => excluirCartao(ativo.id, k.id)); }}>
-                    Excluir
-                  </Botao>
+                  <>
+                    <Botao variante="fantasma" className="h-8 px-3 text-xs" disabled={ocupado}
+                      onClick={() => void acao(() => salvarCartao(ativo.id, { ...k, arquivado: true }))}>
+                      Arquivar
+                    </Botao>
+                    <Botao variante="perigo" className="h-8 px-3 text-xs" disabled={ocupado}
+                      onClick={() => { if (confirm(`Excluir o cartão "${k.nome}"?`)) void acao(() => excluirCartao(ativo.id, k.id)); }}>
+                      Excluir
+                    </Botao>
+                  </>
                 )}
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-card2">
@@ -113,6 +128,9 @@ export function PaginaContasCartoes() {
             </div>
           );
         })}
+        <Arquivadas itens={cartoes.filter((k) => k.arquivado).map((k) => ({ id: k.id, rotulo: `${k.nome} (${k.bandeira})` }))}
+          configuro={configuro} ocupado={ocupado}
+          onReativar={(id) => { const k = cartoes.find((x) => x.id === id)!; void acao(() => salvarCartao(ativo.id, { ...k, arquivado: false })); }} />
       </Card>
 
       {/* ── Categorias ── */}
@@ -206,6 +224,32 @@ function FormCategoria({ onSalvar, ocupado, proximaOrdem }: { onSalvar: (c: Omit
       <Botao className="h-9 px-3 text-xs" disabled={ocupado || !nome.trim()}
         onClick={() => { onSalvar({ nome: nome.trim(), icone: icone || '🏷️', tipo, ordem: proximaOrdem }); setAberto(false); setNome(''); }}>Salvar</Botao>
       <Botao variante="fantasma" className="h-9 px-3 text-xs" onClick={() => setAberto(false)}>Cancelar</Botao>
+    </div>
+  );
+}
+
+// ── Seção recolhida de itens arquivados (F11) ────────────────────────
+function Arquivadas({ itens, configuro, ocupado, onReativar }: {
+  itens: { id: string; rotulo: string }[]; configuro: boolean; ocupado: boolean;
+  onReativar: (id: string) => void;
+}) {
+  const [aberta, setAberta] = useState(false);
+  if (itens.length === 0) return null;
+  return (
+    <div className="border-t border-line bg-card2/40">
+      <button className="w-full px-5 py-2.5 text-left text-xs font-semibold text-ink3 hover:text-ink" onClick={() => setAberta(!aberta)}>
+        🗄️ {itens.length} arquivado(s) {aberta ? '▴' : '▾'}
+      </button>
+      {aberta && itens.map((i) => (
+        <div key={i.id} className="flex items-center gap-3 px-5 py-2 text-xs text-ink2">
+          <span className="flex-1">{i.rotulo}</span>
+          {configuro && (
+            <Botao variante="fantasma" className="h-7 px-2.5 text-[11px]" disabled={ocupado} onClick={() => onReativar(i.id)}>
+              Reativar
+            </Botao>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

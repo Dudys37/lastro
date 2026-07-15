@@ -34,12 +34,26 @@ service cloud.firestore {
       // LIST precisa ser provável pelo filtro da query (membrosUids)
       allow list: if autenticado() && request.auth.uid in resource.data.membrosUids;
 
-      // update: admin+ (config) OU auto-entrada por convite OU saída própria.
-      // As duas últimas só podem tocar membrosUids, com diff exato de 1 uid (o próprio).
-      allow update: if pelomenosAdmin(ws)
+      // update: admin+ (config, SEM tocar na posse) OU auto-entrada por convite
+      // OU saída própria OU transferência de posse (só o dono, transacional).
+      allow update: if (pelomenosAdmin(ws) && _posseIntacta())
         || _entradaPorConvite(ws)
-        || _saidaPropria(ws);
+        || _saidaPropria(ws)
+        || _transferenciaDePosse(ws);
       allow delete: if souDono(ws);
+
+      function _posseIntacta() {
+        // F11: fecha o buraco em que um admin editava criadoPor e "roubava" o workspace
+        return request.resource.data.criadoPor == resource.data.criadoPor;
+      }
+      function _transferenciaDePosse(ws) {
+        // dono passa o bastão para um MEMBRO atual; os papéis trocam na mesma
+        // transação (validado em /membros via getAfter) — nunca fica sem dono.
+        return souDono(ws)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['criadoPor'])
+          && request.resource.data.criadoPor != request.auth.uid
+          && (request.resource.data.criadoPor in resource.data.membrosUids);
+      }
 
       function _soMudouMembros() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['membrosUids']);
@@ -84,11 +98,22 @@ service cloud.firestore {
 
         // gerir papel: admin+; nunca a si mesmo; nunca o dono; nunca promover a
         // dono; admin não mexe em outro admin (só o dono pode).
-        allow update: if pelomenosAdmin(ws)
+        // F11: troca de posse — o dono promove o alvo a 'dono' e se rebaixa a
+        // 'admin' na MESMA transação em que o workspace muda criadoPor
+        // (getAfter amarra as três escritas).
+        allow update: if ( pelomenosAdmin(ws)
           && uid != request.auth.uid
           && uid != donoDoWs(ws)
           && request.resource.data.papel in ['admin','editor','leitor']
-          && (meuPapel(ws) == 'dono' || resource.data.papel != 'admin');
+          && (meuPapel(ws) == 'dono' || resource.data.papel != 'admin') )
+          ||
+          ( souDono(ws) && uid != request.auth.uid
+            && request.resource.data.papel == 'dono'
+            && getAfter(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor == uid )
+          ||
+          ( souDono(ws) && uid == request.auth.uid
+            && request.resource.data.papel == 'admin'
+            && getAfter(/databases/$(database)/documents/workspaces/$(ws)).data.criadoPor != request.auth.uid );
 
         // remover: admin+ com as mesmas proteções, OU sair (a si mesmo, exceto dono)
         allow delete: if

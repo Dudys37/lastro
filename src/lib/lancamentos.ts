@@ -71,3 +71,9 @@ export function gastoNoCartaoNoMes(cartaoId: string, mes: string, lancs: Lancame
     .filter((l) => l.tipo === 'despesa' && l.cartaoId === cartaoId && mesDe(l.data) === mes)
     .reduce((s, l) => s + l.valor, 0);
 }
+
+/** Consolidado das contas ATIVAS (arquivadas ficam de fora do número-mãe;
+ *  o histórico delas permanece e a UI as mostra em seção própria). */
+export function saldoConsolidado(contas: Conta[], lancs: Lancamento[]): Centavos {
+  return contas.filter((c) => !c.arquivada).reduce((s, c) => s + saldoDaConta(c, lancs), 0);
+}
