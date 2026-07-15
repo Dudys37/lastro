@@ -8,13 +8,14 @@ import { podeFazer } from '../../types/dominio';
 import { dividirParcelas, formatarBRL, parseBRL } from '../../lib/dinheiro';
 import { hojeISO, mesAnterior, mesDe, mesSeguinte, resumoLancamentos, rotuloMes } from '../../lib/lancamentos';
 import { dataDaRecorrencia, pendentesDoMes } from '../../lib/recorrencias';
+import { filtrarLancamentos, filtroAtivo, type FiltroLancamentos } from '../../lib/filtros';
 import { useAuth } from '../auth/Auth';
 import { useWorkspace } from '../workspaces/Workspaces';
 import { Botao, Campo, Cartao as Card } from '../../components/ui/Basicos';
 import {
   Categoria, atualizarLancamento, criarLancamento, excluirGrupoParcelas, excluirLancamento,
   excluirRecorrencia, lancarRecorrencia, listarCartoes, listarCategorias, listarContas,
-  listarLancamentosDoMes, listarRecorrencias, salvarRecorrencia,
+  listarLancamentosDoMes, listarRecorrencias, listarTodosLancamentos, salvarRecorrencia,
 } from './repo';
 
 export function PaginaLancamentos() {
@@ -26,6 +27,8 @@ export function PaginaLancamentos() {
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [cats, setCats] = useState<Categoria[]>([]);
   const [recs, setRecs] = useState<Recorrencia[]>([]);
+  const [filtro, setFiltro] = useState<FiltroLancamentos>({});
+  const [historico, setHistorico] = useState<Lancamento[] | null>(null); // carregado ao ativar filtros
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const lanco = podeFazer(papel, 'lancar');
@@ -43,7 +46,21 @@ export function PaginaLancamentos() {
   }
   useEffect(() => { void carregar(); /* eslint-disable-next-line */ }, [ativo?.id, mes]);
 
-  const resumo = useMemo(() => resumoLancamentos(lancs), [lancs]);
+  const buscando = filtroAtivo(filtro);
+  useEffect(() => {
+    (async () => {
+      if (!ativo || !buscando || historico !== null) return;
+      try { setHistorico(await listarTodosLancamentos(ativo.id)); }
+      catch { setErro('Não foi possível buscar no histórico.'); }
+    })();
+    // eslint-disable-next-line
+  }, [ativo?.id, buscando]);
+
+  const resultados = useMemo(
+    () => (buscando ? filtrarLancamentos(historico ?? [], filtro) : lancs),
+    [buscando, historico, filtro, lancs],
+  );
+  const resumo = useMemo(() => resumoLancamentos(resultados), [resultados]);
   const nomeConta = (id: string | null) => contas.find((c) => c.id === id)?.nome ?? '—';
   const cat = (id: string | null) => cats.find((c) => c.id === id);
 
@@ -51,20 +68,30 @@ export function PaginaLancamentos() {
 
   async function acao(fn: () => Promise<unknown>) {
     setOcupado(true); setErro('');
-    try { await fn(); await carregar(); }
+    try {
+      await fn(); await carregar();
+      if (historico !== null && ativo) setHistorico(await listarTodosLancamentos(ativo.id));
+    }
     catch { setErro('Ação não permitida (papel insuficiente) ou falha de conexão.'); }
     finally { setOcupado(false); }
   }
 
   return (
     <div className="grid max-w-4xl gap-4">
-      {/* navegação de mês + resumo */}
+      {/* navegação de mês (ou modo busca) + resumo */}
       <Card className="flex flex-wrap items-center gap-4 px-5 py-4">
+        {buscando ? (
+          <div className="flex items-center gap-2 text-sm font-bold">
+            🔎 Busca no histórico completo
+            <span className="rounded-full bg-card2 px-2 py-0.5 text-[11px] font-bold text-ink2">{resultados.length} resultado(s)</span>
+          </div>
+        ) : (
         <div className="flex items-center gap-2">
           <Botao variante="fantasma" className="h-9 w-9 px-0" onClick={() => setMes(mesAnterior(mes))} aria-label="Mês anterior">‹</Botao>
           <div className="w-44 text-center text-sm font-bold capitalize">{rotuloMes(mes)}</div>
           <Botao variante="fantasma" className="h-9 w-9 px-0" onClick={() => setMes(mesSeguinte(mes))} aria-label="Próximo mês">›</Botao>
         </div>
+        )}
         <div className="ml-auto flex gap-5 text-right text-sm">
           <div><div className="text-[11px] font-bold uppercase text-ink3">Receitas</div><div className="font-extrabold text-pos">{formatarBRL(resumo.receitas)}</div></div>
           <div><div className="text-[11px] font-bold uppercase text-ink3">Despesas</div><div className="font-extrabold text-neg">{formatarBRL(resumo.despesas)}</div></div>
@@ -72,23 +99,29 @@ export function PaginaLancamentos() {
         </div>
       </Card>
 
-      {lanco && (
+      <BarraFiltros filtro={filtro} setFiltro={setFiltro} cats={cats} contas={contas} cartoes={cartoes} />
+
+      {lanco && !buscando && (
         <FormLancamento contas={contas} cartoes={cartoes} cats={cats} ocupado={ocupado}
           onCriar={(n) => void acao(() => criarLancamento(ativo.id, usuario!.uid, n))} />
       )}
 
-      <PainelRecorrencias recs={recs} lancs={lancs} mes={mes} contas={contas} cartoes={cartoes} cats={cats}
+      {!buscando && <PainelRecorrencias recs={recs} lancs={lancs} mes={mes} contas={contas} cartoes={cartoes} cats={cats}
         lanco={lanco} ocupado={ocupado}
         onLancar={(r) => void acao(() => lancarRecorrencia(ativo.id, usuario!.uid, r, dataDaRecorrencia(r, mes)))}
         onLancarTodas={(pend) => void acao(async () => {
           for (const r of pend) await lancarRecorrencia(ativo.id, usuario!.uid, r, dataDaRecorrencia(r, mes));
         })}
         onSalvar={(r) => void acao(() => salvarRecorrencia(ativo.id, r))}
-        onExcluir={(id) => void acao(() => excluirRecorrencia(ativo.id, id))} />
+        onExcluir={(id) => void acao(() => excluirRecorrencia(ativo.id, id))} />}
 
       <Card>
-        {lancs.length === 0 && <p className="px-5 py-8 text-center text-sm text-ink3">Nenhum lançamento em {rotuloMes(mes)}.</p>}
-        {lancs.map((l) => (
+        {resultados.length === 0 && (
+          <p className="px-5 py-8 text-center text-sm text-ink3">
+            {buscando ? (historico === null ? 'Buscando no histórico…' : 'Nada encontrado com esses filtros.') : `Nenhum lançamento em ${rotuloMes(mes)}.`}
+          </p>
+        )}
+        {resultados.slice(0, 150).map((l) => (
           <LinhaLancamento key={l.id} l={l} cats={cats} lanco={lanco} ocupado={ocupado}
             legenda={
               l.tipo === 'transferencia'
@@ -106,6 +139,9 @@ export function PaginaLancamentos() {
               }
             }} />
         ))}
+        {buscando && resultados.length > 150 && (
+          <p className="px-5 py-3 text-[11px] text-ink3">Mostrando os 150 mais recentes de {resultados.length} — refine os filtros.</p>
+        )}
       </Card>
       {erro && <p className="text-xs text-neg">{erro}</p>}
     </div>
@@ -379,5 +415,36 @@ function FormRecorrencia({ contas, cartoes, cats, ocupado, onSalvar }: {
         }}>Salvar</Botao>
       <Botao variante="fantasma" className="h-9 px-3 text-xs" onClick={() => setAberto(false)}>Cancelar</Botao>
     </div>
+  );
+}
+
+// ── Barra de busca & filtros (F9) ────────────────────────────────────
+function BarraFiltros({ filtro, setFiltro, cats, contas, cartoes }: {
+  filtro: FiltroLancamentos; setFiltro: (f: FiltroLancamentos) => void;
+  cats: Categoria[]; contas: Conta[]; cartoes: Cartao[];
+}) {
+  const ativo = filtroAtivo(filtro);
+  return (
+    <Card className="flex flex-wrap items-end gap-3 px-5 py-4">
+      <label className="block min-w-40 flex-1">
+        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink2">🔎 Buscar</span>
+        <input className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm"
+          value={filtro.busca ?? ''} onChange={(e) => setFiltro({ ...filtro, busca: e.target.value })}
+          placeholder="mercado, aluguel, uber… (ignora acentos)" />
+      </label>
+      <Sel rotulo="Tipo" value={filtro.tipo ?? ''} onChange={(v) => setFiltro({ ...filtro, tipo: v as FiltroLancamentos['tipo'] })}
+        opcoes={[{ v: '', r: 'Todos' }, { v: 'despesa', r: '💸 Despesa' }, { v: 'receita', r: '💰 Receita' },
+          { v: 'transferencia', r: '🔁 Transferência' }, { v: 'pagamento', r: '💵 Pagamento de fatura' }]} />
+      <Sel rotulo="Categoria" value={filtro.categoriaId ?? ''} onChange={(v) => setFiltro({ ...filtro, categoriaId: v })}
+        opcoes={[{ v: '', r: 'Todas' }, { v: '_sem', r: '📦 Sem categoria' },
+          ...cats.map((c) => ({ v: c.id, r: `${c.icone} ${c.nome}` }))]} />
+      <Sel rotulo="Conta / cartão" value={filtro.origem ?? ''} onChange={(v) => setFiltro({ ...filtro, origem: v })}
+        opcoes={[{ v: '', r: 'Todos' },
+          ...contas.map((c) => ({ v: c.id, r: `🏦 ${c.nome}` })),
+          ...cartoes.map((k) => ({ v: `cartao:${k.id}`, r: `💳 ${k.nome}` }))]} />
+      {ativo && (
+        <Botao variante="fantasma" className="h-10 px-3 text-xs" onClick={() => setFiltro({})}>✕ Limpar filtros</Botao>
+      )}
+    </Card>
   );
 }

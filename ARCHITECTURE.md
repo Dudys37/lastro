@@ -211,6 +211,21 @@ deliberadamente simples: network-first com fallback ao cache, escopo só na
 origem (Firestore passa direto) — existe para instalabilidade e oscilações de
 rede, **nunca** para servir dado financeiro velho; registrado só em produção.
 
+## F9 — Busca & Filtros de lançamentos (implementada)
+
+**Lógica pura** (`lib/filtros.ts`, testada): `normalizarTexto` (NFD sem
+diacríticos — 'Café' ≡ 'cafe'), filtros combináveis em E lógico (busca na
+descrição, tipo, categoria com '_sem' para não categorizados, conta/cartão —
+conta casa origem E destino de transferências), ordenação por data desc.
+
+**UX**: barra de filtros na página de Lançamentos. Sem filtro, tudo como
+antes (mês a mês). Com QUALQUER filtro ativo, a página entra em modo busca:
+carrega o histórico completo uma vez (cache invalidado após cada ação),
+cabeçalho vira "🔎 Busca no histórico completo · N resultado(s)", o resumo
+passa a somar OS RESULTADOS (responde "quanto gastei de Uber no total?"),
+formulário e recorrências se recolhem, exibição limitada aos 150 mais
+recentes com aviso. Editar/excluir funcionam nos resultados.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.
