@@ -135,6 +135,7 @@ export async function criarLancamento(ws: string, uid: string, n: NovoLancamento
       parcelas: nP > 1 ? { total: nP, numero: i + 1, grupoId } : null,
       faturaMes: null,
       recorrenciaId: n.recorrenciaId ?? null,
+      importId: null,
       criadoPor: uid,
       criadoEm: Date.now(),
     });
@@ -229,4 +230,33 @@ export async function lancarRecorrencia(ws: string, uid: string, r: Recorrencia,
     categoriaId: r.categoriaId, contaId: r.contaId, contaDestinoId: null,
     cartaoId: r.cartaoId, nParcelas: 1, recorrenciaId: r.id,
   });
+}
+
+// ── F10: importação OFX ──────────────────────────────────────────────
+export interface ItemImportacao {
+  tipo: 'receita' | 'despesa';
+  descricao: string;
+  valor: Centavos;               // absoluto
+  data: string;                  // ISO
+  contaId: string | null;
+  cartaoId: string | null;
+  importId: string;              // chave de dedup '{destino}:{FITID}'
+}
+
+/** Grava em lotes de 400 (limite do Firestore é 500 por batch). */
+export async function importarLancamentos(ws: string, uid: string, itens: ItemImportacao[]): Promise<number> {
+  for (let i = 0; i < itens.length; i += 400) {
+    const fatia = itens.slice(i, i + 400);
+    const b = writeBatch(db);
+    for (const it of fatia) {
+      b.set(doc(col(ws, 'lancamentos')), {
+        tipo: it.tipo, descricao: it.descricao, valor: it.valor, data: it.data,
+        categoriaId: null, contaId: it.contaId, contaDestinoId: null, cartaoId: it.cartaoId,
+        parcelas: null, faturaMes: null, recorrenciaId: null, importId: it.importId,
+        criadoPor: uid, criadoEm: Date.now(),
+      });
+    }
+    await b.commit();
+  }
+  return itens.length;
 }

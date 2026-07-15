@@ -226,6 +226,29 @@ passa a somar OS RESULTADOS (responde "quanto gastei de Uber no total?"),
 formulário e recorrências se recolhem, exibição limitada aos 150 mais
 recentes com aviso. Editar/excluir funcionam nos resultados.
 
+## F10 — Importação OFX (implementada)
+
+**Parser puro e hostil-tolerante** (`lib/ofx.ts`, 6 grupos de teste): OFX 1.x
+é SGML sem fechamento de tag — o parser trabalha por blocos `<STMTTRN>` via
+regex, nunca assume XML válido. `valorOFXParaCentavos` cobre o pântano dos
+decimais ('-1.234,56', '1,234.56', '1.234' como milhar, '1234,5') sem passar
+por float; `dataOFXParaISO` recorta e valida os 8 dígitos (fusos ao final são
+ignorados); `decodificarOFX` tenta UTF-8 e cai para windows-1252 quando vê
+excesso de U+FFFD (bancos BR adoram latin-1). Detecção de origem
+(banco × fatura de cartão) pelos envelopes OFX.
+
+**Dedup por FITID**: cada lançamento importado grava
+`importId = '{conta|cartao}:{id}:{FITID}'`; o preview marca duplicadas como
+"já importada" (travadas) — reimportar o mesmo arquivo é seguro por design.
+Campo novo `importId` no Lancamento (null nos demais fluxos).
+
+**Fluxo** (`/importar`, editor+): arquivo lido NO navegador → destino
+conta/cartão (palpite pelo tipo do arquivo) → toggle "inverter sinais"
+(bancos divergem na convenção) → preview com seleção e saldo do lote →
+gravação em batches de 400 (limite do Firestore é 500). Importados chegam
+sem categoria de propósito — a busca '📦 Sem categoria' (F9) é a esteira de
+classificação. Sem mudança de regras.
+
 ## Roadmap
 
 - **F1** Membros & convites: link com token, aceite transacional, tela de gestão de papéis, proteção do dono.

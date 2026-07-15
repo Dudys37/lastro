@@ -6,7 +6,7 @@ import type { Cartao, Conta, Lancamento } from '../types/dominio';
 const L = (p: Partial<Lancamento>): Lancamento => ({
   id: 'x', tipo: 'despesa', descricao: '', valor: 0, data: '2026-07-10',
   categoriaId: null, contaId: null, contaDestinoId: null, cartaoId: null,
-  parcelas: null, faturaMes: null, recorrenciaId: null, criadoPor: 'u', criadoEm: 0, ...p,
+  parcelas: null, faturaMes: null, recorrenciaId: null, importId: null, criadoPor: 'u', criadoEm: 0, ...p,
 });
 const K: Cartao = { id: 'k1', nome: 'Nu', bandeira: 'MC', limite: 500000, diaFechamento: 10, diaVencimento: 17, arquivado: false };
 

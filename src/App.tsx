@@ -8,6 +8,7 @@ import { PaginaContasCartoes } from './features/financeiro/ContasCartoes';
 import { PaginaLancamentos } from './features/financeiro/Lancamentos';
 import { PaginaFaturas } from './features/financeiro/Faturas';
 import { PaginaOrcamentos } from './features/financeiro/Orcamentos';
+import { PaginaImportarOFX } from './features/financeiro/ImportarOFX';
 import { PaginaRelatorios } from './features/relatorios/PaginaRelatorios';
 import { PaginaMetas } from './features/metas/Metas';
 import { PaginaInvestimentos } from './features/investimentos/Investimentos';
@@ -37,6 +38,7 @@ const MENU = [
   { rota: '/metas', rotulo: 'Metas', icone: '🏁' },
   { rota: '/investimentos', rotulo: 'Investimentos', icone: '📊' },
   { rota: '/relatorios', rotulo: 'Relatórios', icone: '📈' },
+  { rota: '/importar', rotulo: 'Importar OFX', icone: '📥' },
   { rota: '/membros', rotulo: 'Membros', icone: '👥' },
 ];
 
@@ -161,6 +163,7 @@ function Shell() {
           <Route path="/metas" element={<PaginaMetas />} />
           <Route path="/investimentos" element={<PaginaInvestimentos />} />
           <Route path="/relatorios" element={<PaginaRelatorios />} />
+          <Route path="/importar" element={<PaginaImportarOFX />} />
           <Route path="/membros" element={<PaginaMembros />} />
         </Routes>
       </main>

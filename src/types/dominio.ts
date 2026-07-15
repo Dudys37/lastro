@@ -99,6 +99,7 @@ export interface Lancamento {
   parcelas: { total: number; numero: number; grupoId: string } | null;
   faturaMes: string | null;        // 'YYYY-MM' da fatura paga (só tipo 'pagamento')
   recorrenciaId: string | null;    // origem, quando lançado a partir de uma recorrência (F7)
+  importId: string | null;         // '{origem}:{FITID}' quando veio de OFX (F10) — chave de dedup
   criadoPor: string;
   criadoEm: number;
 }
