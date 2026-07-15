@@ -221,8 +221,9 @@ function FormLancamento({ contas, cartoes, cats, ocupado, onCriar }: {
             opcoes={[{ v: '', r: 'Selecione…' }, ...contas.filter((c) => !c.arquivada && c.id !== origem).map((c) => ({ v: c.id, r: `🏦 ${c.nome}` }))]} />
         )}
         {podeParcelar && (
-          <Sel rotulo="Parcelas" value={String(nParcelas)} onChange={(v) => setNParcelas(parseInt(v))}
-            opcoes={[1, 2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map((n) => ({ v: String(n), r: n === 1 ? 'À vista' : `${n}×` }))} />
+          <Campo rotulo="Parcelas (1 = à vista)" type="number" min={1} max={60} step={1}
+            value={String(nParcelas)} className="h-10 w-28"
+            onChange={(e) => setNParcelas(Math.min(60, Math.max(1, parseInt(e.target.value) || 1)))} />
         )}
         <Botao disabled={ocupado || !valido} onClick={submeter}>Lançar</Botao>
       </div>

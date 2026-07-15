@@ -14,6 +14,7 @@ import {
 import type { Lancamento } from '../../types/dominio';
 
 const TIPOS_CONTA = { corrente: '🏦 Corrente', poupanca: '🐷 Poupança', dinheiro: '💵 Dinheiro', investimento: '📈 Investimento' } as const;
+const BANDEIRAS = ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard', 'Outra'] as const;
 
 export function PaginaContasCartoes() {
   const { ativo, papel } = useWorkspace();
@@ -195,7 +196,11 @@ function FormCartao({ onSalvar, ocupado }: { onSalvar: (c: Omit<Cartao, 'id'>) =
   return (
     <div className="flex flex-wrap items-end gap-2">
       <Campo rotulo="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nubank Ultravioleta" className="h-9 w-44" />
-      <Campo rotulo="Bandeira" value={bandeira} onChange={(e) => setBandeira(e.target.value)} className="h-9 w-24" />
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink2">Bandeira</span>
+        <select className="h-9 rounded-lg border border-line bg-card px-2 text-sm" value={bandeira} onChange={(e) => setBandeira(e.target.value)}>
+          {BANDEIRAS.map((b) => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </label>
       <Campo rotulo="Limite" value={limite} onChange={(e) => setLimite(e.target.value)} placeholder="5.000,00" className="h-9 w-28" erro={limite && cent === null ? 'inválido' : undefined} />
       <Campo rotulo="Fecha dia" type="number" min={1} max={28} value={fecha} onChange={(e) => setFecha(e.target.value)} className="h-9 w-20" />
       <Campo rotulo="Vence dia" type="number" min={1} max={28} value={vence} onChange={(e) => setVence(e.target.value)} className="h-9 w-20" />
